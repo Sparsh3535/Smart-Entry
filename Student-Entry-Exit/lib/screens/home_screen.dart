@@ -8,7 +8,7 @@ import 'package:flutter/services.dart';
 import '../managers/day_scholar_manager.dart';
 import '../managers/hostel_manager.dart';
 import '../managers/leave_applications_manager.dart';
-import '../managers/data_utils.dart';
+import '../managers/qr_authenticator.dart';
 import 'day_scholar.dart';
 import 'leave_applications.dart';
 import 'hostel.dart';
@@ -28,6 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final HostelManager _hostelManager = HostelManager();
   late final LeaveApplicationsManager _leaveManager =
       LeaveApplicationsManager();
+  late final QRAuthenticator _qrAuthenticator;
 
   ServerSocket? _server;
   bool _listening = false;
@@ -76,6 +77,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _dayScholarManager.logCallback = _log;
     _hostelManager.logCallback = _log;
     _leaveManager.logCallback = _log;
+    // Initialize QR authenticator
+    _qrAuthenticator = QRAuthenticator(
+      dayScholarManager: _dayScholarManager,
+      hostelManager: _hostelManager,
+      leaveManager: _leaveManager,
+    );
+    _qrAuthenticator.logCallback = _log;
     Future.microtask(_startServer);
     _startAdbWatcher(); // simple watcher: wait-for-device then run reverse
   }
@@ -158,7 +166,7 @@ class _HomeScreenState extends State<HomeScreen> {
         final chunk = utf8.decode(data, allowMalformed: true);
         buffer += chunk;
 
-        _processBuffer(
+        _qrAuthenticator.processBuffer(
           bufferHolder: () => buffer,
           bufferSetter: (s) => buffer = s,
           clientAddr: client.remoteAddress.address,
@@ -167,7 +175,7 @@ class _HomeScreenState extends State<HomeScreen> {
       onDone: () {
         _log('Client disconnected: ${client.remoteAddress.address}');
         if (buffer.trim().isNotEmpty) {
-          _processLine(buffer.trim());
+          _qrAuthenticator.processLine(buffer.trim());
           buffer = '';
         }
       },
@@ -176,140 +184,6 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       cancelOnError: true,
     );
-  }
-
-  void _processBuffer({
-    required String Function() bufferHolder,
-    required void Function(String) bufferSetter,
-    String? clientAddr,
-  }) {
-    String buf = bufferHolder();
-    while (buf.isNotEmpty) {
-      final nlIndex = buf.indexOf('\n');
-      if (nlIndex >= 0) {
-        final line = buf.substring(0, nlIndex).trim();
-        if (line.isNotEmpty) _processLine(line);
-        buf = buf.substring(nlIndex + 1);
-        continue;
-      }
-      final firstNonWs = _firstNonWhitespaceIndex(buf);
-      if (firstNonWs < 0) {
-        buf = '';
-        break;
-      }
-      final startChar = buf[firstNonWs];
-      if (startChar == '{' || startChar == '[') {
-        final endIndex = _findJsonEnd(buf, firstNonWs);
-        if (endIndex >= 0) {
-          final jsonStr = buf.substring(firstNonWs, endIndex + 1);
-          _processLine(jsonStr);
-          buf = buf.substring(endIndex + 1);
-          continue;
-        }
-        break;
-      }
-      _processLine(buf.trim());
-      buf = '';
-      break;
-    }
-    bufferSetter(buf);
-  }
-
-  int _firstNonWhitespaceIndex(String s) {
-    for (var i = 0; i < s.length; i++) {
-      if (s[i].trim().isNotEmpty) return i;
-    }
-    return -1;
-  }
-
-  int _findJsonEnd(String s, int start) {
-    final openChar = s[start];
-    final closeChar = (openChar == '{') ? '}' : ']';
-    var depth = 0;
-    var inString = false;
-    var escape = false;
-    for (var i = start; i < s.length; i++) {
-      final ch = s[i];
-      if (inString) {
-        if (escape) {
-          escape = false;
-        } else if (ch == '\\') {
-          escape = true;
-        } else if (ch == '"') {
-          inString = false;
-        }
-        continue;
-      } else {
-        if (ch == '"') {
-          inString = true;
-          continue;
-        }
-        if (ch == openChar) {
-          depth++;
-        } else if (ch == closeChar) {
-          depth--;
-          if (depth == 0) return i;
-        }
-      }
-    }
-    return -1;
-  }
-
-  void _processLine(String line) {
-    if (line.isEmpty) return;
-    _log(
-      'Processing line (${line.length} chars): ${line.length > 200 ? '${line.substring(0, 200)}...' : line}',
-    );
-    try {
-      final decoded = jsonDecode(line);
-      if (decoded is List) {
-        for (final e in decoded) {
-          _processData(e);
-        }
-      } else {
-        _processData(decoded);
-      }
-      _log('Parsed JSON successfully');
-    } catch (e) {
-      _processData({'raw': line});
-      _log('Failed JSON parse — stored raw');
-    }
-  }
-
-  /// Process incoming data and route to appropriate manager
-  void _processData(dynamic obj) {
-    Map<String, dynamic> raw;
-    if (obj is Map<String, dynamic>) {
-      raw = Map<String, dynamic>.from(obj);
-    } else {
-      raw = {'value': obj?.toString()};
-    }
-
-    // If value contains key:value block, parse and merge into raw
-    final kvFromValue = parseKeyValueBlock(raw['value'] ?? raw);
-    if (kvFromValue.isNotEmpty) {
-      kvFromValue.forEach((k, v) {
-        // prefer existing explicit keys in raw; otherwise inject parsed value
-        if (!raw.containsKey(k) ||
-            raw[k] == null ||
-            raw[k].toString().trim().isEmpty) {
-          raw[k] = v;
-        }
-        // also add a capitalized variants to help older lookups
-        final cap = _capitalizedKey(k);
-        if (!raw.containsKey(cap) ||
-            raw[cap] == null ||
-            raw[cap].toString().trim().isEmpty) {
-          raw[cap] = v;
-        }
-      });
-    }
-
-    // If this data has a Type and it routes to leave/day/hostel, let routing handle it.
-    if (_routeByType(raw)) return;
-
-    // Default: treat as generic entry (shouldn't normally reach here)
-    _log('Unrouted data: ${raw.toString().substring(0, 100)}');
   }
 
   void _clear() {
@@ -1063,92 +937,5 @@ class _HomeScreenState extends State<HomeScreen> {
       _adbWatcherProcess?.kill();
     } catch (_) {}
     _adbWatcherProcess = null;
-  }
-
-  String _capitalizedKey(String k) {
-    if (k.isEmpty) return k;
-    final parts = k.split(RegExp(r'\s+'));
-    return parts
-        .map((p) => p.isEmpty ? p : (p[0].toUpperCase() + p.substring(1)))
-        .join(' ');
-  }
-
-  /// Route incoming raw map/text by its Type key.
-  /// Returns true if routed (so caller doesn't add a generic row).
-  bool _routeByType(Map<String, dynamic> raw) {
-    // try direct keys first
-    String? type = firstString(raw, ['type', 'Type']);
-    final kv = parseKeyValueBlock(raw);
-    type ??= kv['type'];
-    if (type == null) return false;
-    final t = type.toLowerCase();
-
-    // prefer possible value string for leave parsing
-    final possibleValue = raw['value'] ?? kv['value'];
-
-    // Leave
-    if (t.contains('leave')) {
-      final pl =
-          _leaveManager.parseLeaveApplication(raw) ??
-          _leaveManager.parseLeaveApplication(possibleValue);
-      if (pl != null) {
-        _leaveManager.addLeaveApplication(pl);
-        setState(() {}); // trigger UI update
-        return true;
-      }
-      return false;
-    }
-
-    // Hostel
-    if (t.contains('hostel') || t.contains('hosteller')) {
-      final name = firstString(raw, ['name', 'Name']) ?? kv['name'];
-      final id =
-          firstString(raw, ['id', 'Id', 'roll', 'roll_no', 'rollno']) ??
-          kv['roll number'] ??
-          kv['roll'];
-      final phone =
-          firstString(raw, ['phone', 'Phone', 'mobile']) ??
-          kv['phone number'] ??
-          kv['phone'];
-      final location =
-          firstString(raw, ['location', 'Location', 'address']) ??
-          kv['location'];
-      final minimal = <String, dynamic>{
-        'name': name,
-        'id': id,
-        'phone': phone,
-        'location': location,
-      };
-      _hostelManager.addOrUpdateRow(minimal);
-      setState(() {}); // trigger UI update
-      return true;
-    }
-
-    // Day scholar
-    if (t.contains('day') || t.contains('scholar')) {
-      final name = firstString(raw, ['name', 'Name']) ?? kv['name'];
-      final id =
-          firstString(raw, ['id', 'Id', 'roll', 'roll_no', 'rollno']) ??
-          kv['roll number'] ??
-          kv['roll'];
-      final phone =
-          firstString(raw, ['phone', 'Phone', 'mobile']) ??
-          kv['phone number'] ??
-          kv['phone'];
-      final location =
-          firstString(raw, ['location', 'Location', 'address']) ??
-          kv['location'];
-      final minimal = <String, dynamic>{
-        'name': name,
-        'id': id,
-        'phone': phone,
-        'location': location,
-      };
-      _dayScholarManager.addOrUpdateRow(minimal);
-      setState(() {}); // trigger UI update
-      return true;
-    }
-
-    return false;
   }
 }
