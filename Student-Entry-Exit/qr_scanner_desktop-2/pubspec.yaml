@@ -1,0 +1,25 @@
+name: qr_scanner_desktop
+description: A Flutter desktop application for scanning QR codes using the desktop camera.
+
+publish_to: 'none'
+
+environment:
+  sdk: '>=2.17.0 <3.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  qr_code_scanner: ^0.9.0
+  camera: ^0.10.0
+  provider: ^6.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/images/  # Add your asset images here if needed
+    - assets/sounds/  # Add your asset sounds here if needed

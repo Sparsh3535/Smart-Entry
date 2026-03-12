@@ -1,0 +1,168 @@
+[1mdiff --git a/lib/screens/home_screen.dart b/lib/screens/home_screen.dart[m
+[1mindex 27f6c4a..1ee45b8 100644[m
+[1m--- a/lib/screens/home_screen.dart[m
+[1m+++ b/lib/screens/home_screen.dart[m
+[36m@@ -411,7 +411,9 @@[m [mclass _HomeScreenState extends State<HomeScreen> {[m
+                   MaterialPageRoute(builder: (_) => DayScholarScreen(applications: _dayRows)),[m
+                 );[m
+               },[m
+[31m-              child: _dashCard('Day scholar', 'Open'),[m
+[32m+[m[32m              child: _dashCard('Day scholar', '${_dayRows.length}', onTap: () {[m
+[32m+[m[32m                Navigator.of(context).push(MaterialPageRoute(builder: (_) => DayScholarScreen(applications: _dayRows)));[m
+[32m+[m[32m              }),[m
+             ),[m
+             const SizedBox(width: 12),[m
+             // Leave Applications card — opens separate screen[m
+[36m@@ -467,32 +469,24 @@[m [mclass _HomeScreenState extends State<HomeScreen> {[m
+     );[m
+   }[m
+ [m
+[31m-  Widget _dashCard([m
+[31m-    String title,[m
+[31m-    String value, {[m
+[31m-    double width = 140,[m
+[31m-    Color? color,[m
+[31m-  }) {[m
+[31m-    return Card([m
+[31m-      child: Container([m
+[31m-        width: width,[m
+[31m-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),[m
+[31m-        child: Column([m
+[31m-          crossAxisAlignment: CrossAxisAlignment.start,[m
+[31m-          children: [[m
+[31m-            Text([m
+[31m-              title,[m
+[31m-              style: const TextStyle(fontSize: 12, color: Colors.grey),[m
+[31m-            ),[m
+[31m-            const SizedBox(height: 6),[m
+[31m-            Text([m
+[31m-              value,[m
+[31m-              style: TextStyle(fontSize: 16, color: color ?? Colors.black),[m
+[31m-            ),[m
+[31m-          ],[m
+[32m+[m[32m  // Dashboard small card helper — accept optional onTap[m
+[32m+[m[32m  Widget _dashCard(String title, String subtitle, {VoidCallback? onTap}) {[m
+[32m+[m[32m    return InkWell([m
+[32m+[m[32m      onTap: onTap,[m
+[32m+[m[32m      child: Card([m
+[32m+[m[32m        child: SizedBox([m
+[32m+[m[32m          width: 180,[m
+[32m+[m[32m          height: 80,[m
+[32m+[m[32m          child: Padding([m
+[32m+[m[32m            padding: const EdgeInsets.all(12.0),[m
+[32m+[m[32m            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [[m
+[32m+[m[32m              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),[m
+[32m+[m[32m              const SizedBox(height: 8),[m
+[32m+[m[32m              Text(subtitle),[m
+[32m+[m[32m            ]),[m
+[32m+[m[32m          ),[m
+         ),[m
+[31m-      ),[m
+[31m-    );[m
+[32m+[m[32m      );[m
+   }[m
+ [m
+   // Left navigation pane[m
+[36m@@ -1069,31 +1063,23 @@[m [mclass _HomeScreenState extends State<HomeScreen> {[m
+     // Day scholar[m
+     if (t.contains('day') || t.contains('scholar')) {[m
+       final name = _firstString(raw, ['name', 'Name']) ?? kv['name'];[m
+[31m-      final id =[m
+[31m-          _firstString(raw, ['id', 'Id', 'roll', 'roll_no', 'rollno']) ??[m
+[31m-          kv['roll number'] ??[m
+[31m-          kv['roll'];[m
+[31m-      final phone =[m
+[31m-          _firstString(raw, ['phone', 'Phone', 'mobile']) ??[m
+[31m-          kv['phone number'] ??[m
+[31m-          kv['phone'];[m
+[31m-      final location =[m
+[31m-          _firstString(raw, ['location', 'Location', 'address']) ??[m
+[31m-          kv['location'];[m
+[32m+[m[32m      final id = _firstString(raw, ['id', 'Id', 'roll', 'roll_no', 'rollno']) ?? kv['roll number'] ?? kv['roll'];[m
+[32m+[m[32m      final phone = _firstString(raw, ['phone', 'Phone', 'mobile']) ?? kv['phone number'] ?? kv['phone'];[m
+[32m+[m[32m      final location = _firstString(raw, ['location', 'Location', 'address']) ?? kv['location'];[m
+       final minimal = <String, dynamic>{[m
+         'name': name,[m
+         'id': id,[m
+         'phone': phone,[m
+         'location': location,[m
+       };[m
+[31m-      _insertOrUpdateRow(_dayRows, minimal);[m
+[32m+[m[32m      _insertOrUpdateDayRow(_dayRows, minimal);[m
+       return true;[m
+     }[m
+ [m
+     return false;[m
+   }[m
+ [m
+[31m-  // per-table storage[m
+[32m+[m[32m  // per-table storage (add these if not already present)[m
+   final List<Map<String, dynamic>> _dayRows = [];[m
+   final List<Map<String, dynamic>> _leaveApps = [];[m
+ [m
+[36m@@ -1206,5 +1192,75 @@[m [mclass _HomeScreenState extends State<HomeScreen> {[m
+     };[m
+     setState(() => target.add(normalized));[m
+   }[m
+[32m+[m
+[32m+[m[32m  // Insert/update day-scholar rows:[m
+[32m+[m[32m  // - new person -> sets intime[m
+[32m+[m[32m  // - next scan for same person -> sets outtime[m
+[32m+[m[32m  // - if both intime+outtime exist, a subsequent scan starts a new session (new intime)[m
+[32m+[m[32m  void _insertOrUpdateDayRow(List<Map<String, dynamic>> target, Map<String, dynamic> fields) {[m
+[32m+[m[32m    final String? name = fields['name'] as String?;[m
+[32m+[m[32m    final String? id = fields['id'] as String?;[m
+[32m+[m[32m    final String? phone = fields['phone'] as String?;[m
+[32m+[m
+[32m+[m[32m    for (var i = target.length - 1; i >= 0; i--) {[m
+[32m+[m[32m      final r = target[i];[m
+[32m+[m[32m      final sameById = id != null && r['id'] != null && r['id'].toString() == id;[m
+[32m+[m[32m      final sameByPhone = (id == null || !sameById) && phone != null && r['phone'] != null && r['phone'].toString() == phone;[m
+[32m+[m[32m      final sameByName = (id == null && phone == null) && name != null && r['name'] != null && r['name'].toString() == name;[m
+[32m+[m
+[32m+[m[32m      if (sameById || sameByPhone || sameByName) {[m
+[32m+[m[32m        final prevIn = (r['intime'] as String?) ?? '';[m
+[32m+[m[32m        final prevOut = (r['outtime'] as String?) ?? '';[m
+[32m+[m[32m        final now = _shortDateTime(DateTime.now());[m
+[32m+[m
+[32m+[m[32m        if (prevIn.trim().isEmpty) {[m
+[32m+[m[32m          // first recorded event -> set intime[m
+[32m+[m[32m          setState(() {[m
+[32m+[m[32m            r['intime'] = now;[m
+[32m+[m[32m            target[i] = Map<String, dynamic>.from(r);[m
+[32m+[m[32m            _log('DayScholar: set intime to $now for id=${id ?? phone ?? name}');[m
+[32m+[m[32m          });[m
+[32m+[m[32m        } else if (prevOut.trim().isEmpty) {[m
+[32m+[m[32m          // intime exists but outtime missing -> set outtime[m
+[32m+[m[32m          setState(() {[m
+[32m+[m[32m            r['outtime'] = now;[m
+[32m+[m[32m            target[i] = Map<String, dynamic>.from(r);[m
+[32m+[m[32m            _log('DayScholar: set outtime to $now for id=${id ?? phone ?? name}');[m
+[32m+[m[32m          });[m
+[32m+[m[32m        } else {[m
+[32m+[m[32m          // previous session complete -> start a new session (new intime, clear outtime)[m
+[32m+[m[32m          final newRow = <String, dynamic>{[m
+[32m+[m[32m            'name': r['name'],[m
+[32m+[m[32m            'id': r['id'],[m
+[32m+[m[32m            'phone': r['phone'],[m
+[32m+[m[32m            'location': r['location'],[m
+[32m+[m[32m            'intime': now,[m
+[32m+[m[32m            'outtime': null,[m
+[32m+[m[32m            'security': null,[m
+[32m+[m[32m          };[m
+[32m+[m[32m          setState(() {[m
+[32m+[m[32m            target.add(newRow);[m
+[32m+[m[32m            _log('DayScholar: started new session (intime=$now) for id=${id ?? phone ?? name}');[m
+[32m+[m[32m          });[m
+[32m+[m[32m        }[m
+[32m+[m[32m        return;[m
+[32m+[m[32m      }[m
+[32m+[m[32m    }[m
+[32m+[m
+[32m+[m[32m    // not found -> add with intime set[m
+[32m+[m[32m    final normalized = <String, dynamic>{[m
+[32m+[m[32m      'name': name,[m
+[32m+[m[32m      'id': id,[m
+[32m+[m[32m      'phone': phone,[m
+[32m+[m[32m      'location': fields['location'],[m
+[32m+[m[32m      'intime': _short
