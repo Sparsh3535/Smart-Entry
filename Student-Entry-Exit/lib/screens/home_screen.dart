@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -22,8 +21,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
-
-  // Initialize managers
   late final DayScholarManager _dayScholarManager = DayScholarManager();
   late final HostelManager _hostelManager = HostelManager();
   late final LeaveApplicationsManager _leaveManager =
@@ -46,29 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // console logs
   final List<String> _logs = [];
-
-  // UI state — default to console as requested
-  String _navSelection = 'console'; // 'console' | 'table' | 'settings' etc.
-
-  // fixed column keys and labels in desired order
-  static const List<String> _colKeys = [
-    'name',
-    'id',
-    'phone',
-    'location',
-    'intime',
-    'outtime',
-    'security',
-  ];
-  static const Map<String, String> _colLabels = {
-    'name': 'Name',
-    'id': 'Id',
-    'phone': 'Phone',
-    'location': 'Location',
-    'intime': 'In Time',
-    'outtime': 'Out Time',
-    'security': 'Security',
-  };
 
   @override
   void initState() {
@@ -198,276 +172,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  List<DataColumn> _buildColumns() {
-    return _colKeys
-        .map((k) => DataColumn(label: Text(_colLabels[k] ?? k)))
-        .toList();
-  }
-
-  List<DataRow> _buildRows() {
-    return _hostelManager.rows.map((r) {
-      // helper to get string safely
-      String sval(dynamic v) => v == null ? '' : v.toString();
-      const cellStyle = TextStyle(fontSize: 14);
-
-      final name = sval(r['name']);
-      final id = sval(r['id']);
-      final phone = sval(r['phone']);
-      final location = sval(r['location']);
-      final intime = sval(r['intime']);
-      final outtime = sval(r['outtime']);
-      final security = sval(r['security']);
-
-      // security chip color resolution
-      Color chipColor() {
-        final s = security.toLowerCase();
-        if (s.contains('checked')) return Colors.green.shade600;
-        if (s.contains('late')) return Colors.amber.shade700;
-        if (s.contains('unverified') || s.contains('un')) {
-          return Colors.red.shade400;
-        }
-        // fallback based on presence: if intime present and outtime empty -> checked in
-        if (intime.isNotEmpty && outtime.isEmpty) return Colors.green.shade600;
-        return Colors.grey.shade400;
-      }
-
-      String chipLabel0() {
-        if (security.isNotEmpty) return security;
-        if (intime.isNotEmpty && outtime.isEmpty) return 'Checked In';
-        return '';
-      }
-
-      Widget intimeWidget() {
-        if (intime.isEmpty) return const SelectableText('');
-        return SelectableText(
-          intime,
-          style: const TextStyle(
-            color: Color(0xFF2E7D32),
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        );
-      }
-
-      Widget outtimeWidget() {
-        if (outtime.isEmpty) {
-          return const Text('\u2014', style: TextStyle(color: Colors.black45));
-        }
-        return Text(
-          outtime,
-          style: const TextStyle(
-            color: Color(0xFFD32F2F),
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-        );
-      }
-
-      final chipLabel = chipLabel0();
-
-      return DataRow(
-        cells: [
-          DataCell(SelectableText(name, style: cellStyle)),
-          DataCell(SelectableText(id, style: cellStyle)),
-          DataCell(SelectableText(phone, style: cellStyle)),
-          DataCell(SelectableText(location, style: cellStyle)),
-          DataCell(intimeWidget()),
-          DataCell(outtimeWidget()),
-          DataCell(
-            chipLabel.isEmpty
-                ? const SizedBox.shrink()
-                : Chip(
-                    label: Text(
-                      chipLabel,
-                      style: const TextStyle(color: Colors.white, fontSize: 13),
-                    ),
-                    backgroundColor: chipColor(),
-                  ),
-          ),
-        ],
-      );
-    }).toList();
-  }
-
-  Widget _buildDashboard() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            _dashCard('Hostel', '${_hostelManager.rows.length}'),
-            const SizedBox(width: 12),
-            // Day scholar card — opens separate screen
-            InkWell(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => DayScholarScreen(
-                      applicationsListenable: _dayScholarManager.notifier,
-                    ),
-                  ),
-                );
-              },
-              child: _dashCard(
-                'Day scholar',
-                '${_dayScholarManager.rows.length}',
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Leave Applications card — opens separate screen
-            InkWell(
-              onTap: () {
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => LeaveApplicationsScreen(
-                      applicationsListenable: _leaveManager.notifier,
-                    ),
-                  ),
-                );
-              },
-              child: _dashCard(
-                'Leave Applications',
-                '${_leaveManager.rows.length}',
-              ),
-            ),
-            const SizedBox(width: 12),
-            // Security login card — shows current security name in a dialog
-            InkWell(
-              onTap: () {
-                showDialog(
-                  context: context,
-                  builder: (ctx) => AlertDialog(
-                    title: const Text('Security login'),
-                    content: Text(
-                      'Current security: ${_currentSecurityName()}',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(ctx).pop(),
-                        child: const Text('Close'),
-                      ),
-                    ],
-                  ),
-                );
-              },
-              child: _dashCard('Security login', 'View'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Quick actions',
-                  style: TextStyle(fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: [
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.play_circle),
-                      label: const Text('Start Server'),
-                      onPressed: _listening ? null : _startServer,
-                    ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.stop_circle),
-                      label: const Text('Stop Server'),
-                      onPressed: _listening ? _stopServer : null,
-                    ),
-                    ElevatedButton.icon(
-                      icon: const Icon(Icons.clear_all),
-                      label: const Text('Clear Table'),
-                      onPressed: _clear,
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
-        // SECURITY LOGIN SECTION - visible card so it's not hidden inside the
-        // dashboard row. Shows the current security person and provides a
-        // button to view/change (view opens dialog). UI-only; does not
-        // persist changes beyond runtime.
-        Card(
-          color: Colors.grey.shade50,
-          child: Padding(
-            padding: const EdgeInsets.all(12.0),
-            child: Row(
-              children: [
-                const Expanded(
-                  child: Text(
-                    'Security login',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                  ),
-                ),
-                Text(
-                  _currentSecurityName(),
-                  style: const TextStyle(fontSize: 14, color: Colors.black87),
-                ),
-                const SizedBox(width: 12),
-                ElevatedButton(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (ctx) => AlertDialog(
-                        title: const Text('Security login'),
-                        content: Text(
-                          'Current security: ${_currentSecurityName()}',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(ctx).pop(),
-                            child: const Text('Close'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  child: const Text('View'),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _dashCard(
-    String title,
-    String value, {
-    double width = 140,
-    Color? color,
-  }) {
-    return Card(
-      child: Container(
-        width: width,
-        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              value,
-              style: TextStyle(fontSize: 16, color: color ?? Colors.black),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   // Left navigation pane
   Widget _buildLeftPane() {
     return Drawer(
@@ -506,16 +210,13 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.code),
               title: const Text('Console'),
-              selected: _navSelection == 'console',
               onTap: () {
-                setState(() => _navSelection = 'console');
                 Navigator.of(context).pop();
               },
             ),
             ListTile(
               leading: const Icon(Icons.table_chart),
               title: const Text('Hostel'),
-              selected: _navSelection == 'hostel_table',
               onTap: () {
                 Navigator.of(context).pop();
                 Navigator.of(context).push(
@@ -529,7 +230,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.person_outline),
               title: const Text('Day scholar'),
-              selected: _navSelection == 'day_scholar',
               onTap: () {
                 Navigator.of(context).pop();
                 Navigator.of(context).push(
@@ -580,9 +280,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ListTile(
               leading: const Icon(Icons.settings),
               title: const Text('Settings'),
-              selected: _navSelection == 'settings',
               onTap: () {
-                setState(() => _navSelection = 'settings');
                 Navigator.of(context).pop();
               },
             ),
@@ -675,136 +373,237 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildMainContent() {
-    if (_navSelection == 'console') {
-      // show dashboard above console so the Day scholar card is visible and tappable
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: Column(
-            children: [
-              // dashboard (cards + quick actions)
-              _buildDashboard(),
-              const SizedBox(height: 8),
-              // console area expands to fill remaining space
-              Expanded(child: _buildConsoleView(showControls: true)),
-            ],
-          ),
-        ),
-      );
-    } else if (_navSelection == 'table') {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(8.0),
-          child: _hostelManager.rows.isEmpty
-              ? const Center(child: Text('No hostel data received yet.'))
-              : Scrollbar(
-                  controller: _hScroll,
-                  thumbVisibility: true,
-                  child: SingleChildScrollView(
-                    controller: _hScroll,
-                    scrollDirection: Axis.horizontal,
-                    child: Builder(
-                      builder: (ctx) {
-                        final screenWidth = MediaQuery.of(ctx).size.width - 48;
-                        // Use available screen width as the table min width so the
-                        // table does not exceed the viewport and require extra
-                        // horizontal scrolling. Keep a small minimum so very
-                        // narrow screens still render reasonably.
-                        final minW = screenWidth;
-                        final colCount = _colKeys.length;
-                        // Slightly reduce column spacing so more columns fit on
-                        // typical screens while keeping the layout readable.
-                        final columnSpacing = math.max(
-                          12.0,
-                          (minW / math.max(1, colCount).toDouble()) * 0.7,
-                        );
-                        return ConstrainedBox(
-                          constraints: BoxConstraints(minWidth: minW),
-                          child: SingleChildScrollView(
-                            child: DataTable(
-                              columns: _buildColumns(),
-                              rows: _buildRows(),
-                              columnSpacing: columnSpacing,
-                              dataRowHeight: 64,
-                              headingRowHeight: 64,
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          return SingleChildScrollView(
+            child: Column(
+              children: [
+                // First row: Day Scholar + Leave Applications
+                Row(
+                  children: [
+                    // Day Scholar Block
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => DayScholarScreen(
+                                applicationsListenable:
+                                    _dayScholarManager.notifier,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Card(
+                          elevation: 4,
+                          child: Container(
+                            height: 150,
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.person_outline,
+                                  size: 48,
+                                  color: Colors.blue,
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Day Scholar',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${_dayScholarManager.rows.length} Entries',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Leave Applications Block
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => LeaveApplicationsScreen(
+                                applicationsListenable: _leaveManager.notifier,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Card(
+                          elevation: 4,
+                          child: Container(
+                            height: 150,
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.assignment,
+                                  size: 48,
+                                  color: Colors.orange,
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Leave Applications',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${_leaveManager.rows.length} Applications',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                // Second row: Hosteller + Console
+                Row(
+                  children: [
+                    // Hosteller Block
+                    Expanded(
+                      child: InkWell(
+                        onTap: () {
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => HostelScreen(
+                                rowsListenable: _hostelManager.notifier,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Card(
+                          elevation: 4,
+                          child: Container(
+                            height: 150,
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.apartment,
+                                  size: 48,
+                                  color: Colors.green,
+                                ),
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Hosteller',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${_hostelManager.rows.length} Entries',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    // Console Block
+                    Expanded(
+                      child: Card(
+                        elevation: 4,
+                        child: Container(
+                          height: 150,
+                          padding: const EdgeInsets.all(16),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.code,
+                                size: 48,
+                                color: Colors.purple,
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Console',
+                                style: TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                '${_logs.length} Logs',
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                // Console View Section (below blocks)
+                Card(
+                  elevation: 4,
+                  child: Container(
+                    height: 300,
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(8.0),
+                    child: Column(
+                      children: [
+                        Expanded(child: _buildConsoleView(showControls: false)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            const Spacer(),
+                            ElevatedButton.icon(
+                              icon: const Icon(Icons.clear_all),
+                              label: const Text('Clear All Data'),
+                              onPressed: _clear,
+                            ),
+                            const SizedBox(width: 8),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
                 ),
-        ),
-      );
-    } else {
-      // settings: show listening status here only
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                'Settings',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextFormField(
-                      controller: _portController,
-                      decoration: const InputDecoration(
-                        labelText: 'Port',
-                        border: OutlineInputBorder(),
-                      ),
-                      keyboardType: TextInputType.number,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  ElevatedButton.icon(
-                    icon: Icon(
-                      _listening ? Icons.stop_circle : Icons.play_circle,
-                    ),
-                    label: Text(_listening ? 'Stop' : 'Start'),
-                    onPressed: () {
-                      if (_listening) {
-                        _stopServer();
-                      } else {
-                        _startServer();
-                      }
-                    },
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                children: [
-                  const Text(
-                    'Server status:',
-                    style: TextStyle(fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _listening ? 'Listening' : 'Stopped',
-                    style: TextStyle(
-                      color: _listening ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              ElevatedButton.icon(
-                icon: const Icon(Icons.clear_all),
-                label: const Text('Clear Table'),
-                onPressed: _clear,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
+              ],
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
