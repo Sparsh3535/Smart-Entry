@@ -399,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Card(
                           elevation: 4,
                           child: Container(
-                            height: 150,
+                            height: 200,
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -447,7 +447,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Card(
                           elevation: 4,
                           child: Container(
-                            height: 150,
+                            height: 200,
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -500,7 +500,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: Card(
                           elevation: 4,
                           child: Container(
-                            height: 150,
+                            height: 200,
                             padding: const EdgeInsets.all(16),
                             child: Column(
                               mainAxisAlignment: MainAxisAlignment.center,
@@ -535,36 +535,72 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 16),
                     // Console Block
                     Expanded(
-                      child: Card(
-                        elevation: 4,
-                        child: Container(
-                          height: 150,
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.code,
-                                size: 48,
-                                color: Colors.purple,
+                      child: InkWell(
+                        onTap: () {
+                          _scaffoldKey.currentState?.showBottomSheet(
+                            (context) => Container(
+                              height: 400,
+                              color: Colors.white,
+                              child: Column(
+                                children: [
+                                  Padding(
+                                    padding: const EdgeInsets.only(
+                                      top: 8,
+                                      right: 8,
+                                    ),
+                                    child: Align(
+                                      alignment: Alignment.topRight,
+                                      child: IconButton(
+                                        icon: const Icon(Icons.close),
+                                        onPressed: () =>
+                                            Navigator.of(context).pop(),
+                                      ),
+                                    ),
+                                  ),
+                                  Expanded(
+                                    child: _buildConsoleView(
+                                      showControls: false,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Console',
-                                style: TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
+                            ),
+                          );
+                        },
+                        child: Card(
+                          elevation: 4,
+                          child: Container(
+                            height: 200,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                const Icon(
+                                  Icons.code,
+                                  size: 48,
+                                  color: Colors.purple,
                                 ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '${_logs.length} Logs',
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.grey,
+                                const SizedBox(height: 16),
+                                const Text(
+                                  'Console',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
-                              ),
-                            ],
+                                const SizedBox(height: 8),
+                                Text(
+                                  '${_logs.length} Logs',
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
