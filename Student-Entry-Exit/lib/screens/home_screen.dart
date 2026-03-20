@@ -180,19 +180,55 @@ class _HomeScreenState extends State<HomeScreen> {
   void _processBufferLine(String line) async {
     if (line.isEmpty) return;
 
-    _log('Processing received data (${line.length} chars): ${line.length > 200 ? '${line.substring(0, 200)}...' : line}');
+    _log(
+      'Processing received data (${line.length} chars): ${line.length > 200 ? '${line.substring(0, 200)}...' : line}',
+    );
 
     // Check if it's JSON (starts with { or [)
     if (line.trim().startsWith('{') || line.trim().startsWith('[')) {
-      _log('Detected JSON format - passing to QRAuthenticator');
-      _qrAuthenticator.processLine(line);
+      _log('Detected JSON format - parsing...');
+
+      try {
+        final jsonData = jsonDecode(line);
+
+        // Check if it's a wrapper format like {"event":"qr_scan","value":"docId"}
+        if (jsonData is Map && jsonData.containsKey('value')) {
+          final valueField = jsonData['value']?.toString() ?? '';
+
+          // Check if the value is a simple document ID (not a full object)
+          final simpleKeyPattern = RegExp(r'^[a-zA-Z0-9_\-]+$');
+          if (simpleKeyPattern.hasMatch(valueField) && valueField.isNotEmpty) {
+            _log(
+              'Detected wrapper JSON with docId value: "$valueField" - fetching from Firebase',
+            );
+            await _fetchAndProcessFromFirebase(valueField);
+            return;
+          }
+        }
+
+        // Check if it has type/name fields indicating full student data
+        if (jsonData is Map &&
+            (jsonData.containsKey('type') || jsonData.containsKey('name'))) {
+          _log('Detected full student data JSON - passing to QRAuthenticator');
+          _qrAuthenticator.processLine(line);
+          return;
+        }
+
+        // Default: pass JSON to QRAuthenticator
+        _log('Processing as standard JSON - passing to QRAuthenticator');
+        _qrAuthenticator.processLine(line);
+      } catch (e) {
+        _log('JSON parse error: $e - treating as raw data');
+        _qrAuthenticator.processLine(line);
+      }
       return;
     }
 
-    // Check if it's a simple rollno key (alphanumeric, possibly with underscores/hyphens)
+    // Check if it's a simple key (alphanumeric, possibly with underscores/hyphens)
+    // This is the Firestore document ID received from port 9000
     final simpleKeyPattern = RegExp(r'^[a-zA-Z0-9_\-]+$');
     if (simpleKeyPattern.hasMatch(line)) {
-      _log('Detected rollno key format: "$line" - fetching from Firebase');
+      _log('Detected Firestore docId format: "$line" - fetching from Firebase');
       await _fetchAndProcessFromFirebase(line);
       return;
     }
@@ -202,24 +238,64 @@ class _HomeScreenState extends State<HomeScreen> {
     _qrAuthenticator.processLine(line);
   }
 
-  /// Fetch student data from Firebase by rollno and process it
-  Future<void> _fetchAndProcessFromFirebase(String rollNo) async {
+  /// Fetch student data from Firebase by document ID and process it
+  Future<void> _fetchAndProcessFromFirebase(String docId) async {
     try {
-      final studentData = await _firebaseService.fetchStudentByRollNo(rollNo);
+      _log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      _log('[PORT 9000] KEY RECEIVED: $docId');
+      _log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      _log('[FIREBASE] Fetching document from database...');
+      final studentData = await _firebaseService.fetchByDocumentId(docId);
 
       if (studentData != null) {
-        _log('✓ Firebase lookup successful for rollno: $rollNo');
-        _log('Fetched data type: ${studentData['type']}');
-        
-        // Convert the fetched data to JSON and pass to QRAuthenticator
-        // This ensures the same processing pipeline
-        final jsonData = jsonEncode(studentData);
-        _qrAuthenticator.processLine(jsonData);
+        _log('');
+        _log('✓✓✓ FIREBASE FETCH SUCCESSFUL ✓✓✓');
+        _log('[DATA] Type: ${studentData['type']}');
+        _log('[DATA] Name: ${studentData['name']}');
+        _log('[DATA] ID/RollNo: ${studentData['id']}');
+        _log('[DATA] Phone: ${studentData['phone']}');
+        _log('[DATA] Location: ${studentData['location']}');
+        _log('[DATA] Status: ${studentData['status']}');
+
+        _log('');
+        _log('[FULL DATA OBJECT]:');
+        _log('[TYPE]: ${studentData['type']}');
+        _log('[NAME]: ${studentData['name']}');
+        _log('[ID]: ${studentData['id']}');
+        _log('[ROLLNO]: ${studentData['rollno']}');
+        _log('[PHONE]: ${studentData['phone']}');
+        _log('[DEGREE]: ${studentData['degree']}');
+        _log('[STATUS]: ${studentData['status']}');
+        _log('[DESTINATION]: ${studentData['destination']}');
+        _log('[HOSTEL]: ${studentData['hostel']}');
+        _log('[ROOM_NUMBER]: ${studentData['roomNumber']}');
+        _log('[LOCATION]: ${studentData['location']}');
+        _log('[CREATED_AT]: ${studentData['createdAt']}');
+        _log('[SCAN_COUNT]: ${studentData['scanCount']}');
+        _log('[SECURITY]: ${studentData['security']}');
+
+        // Pass the fetched data directly to QRAuthenticator as a Map
+        // (no JSON encode/decode round-trip — avoids issues with non-serializable values)
+        _log('');
+        _log('[ROUTING] Passing data directly to QRAuthenticator for processing...');
+
+        _qrAuthenticator.processMap(studentData);
+
+        _log('✓ Processing complete');
       } else {
-        _log('✗ No student found in Firebase for rollno: $rollNo');
+        _log('');
+        _log('✗✗✗ FIREBASE FETCH FAILED ✗✗✗');
+        _log('✗ No student found in Firebase for docId: $docId');
+        _log('Please verify:');
+        _log('  - Document ID is correct');
+        _log('  - Document exists in gate_passes or leave_requests collection');
+        _log('  - Firebase connection is working');
       }
     } catch (e) {
-      _log('✗ Firebase lookup failed for rollno "$rollNo": $e');
+      _log('');
+      _log('✗✗✗ ERROR DURING FIREBASE LOOKUP ✗✗✗');
+      _log('✗ Firebase lookup failed for docId "$docId": $e');
     }
   }
 

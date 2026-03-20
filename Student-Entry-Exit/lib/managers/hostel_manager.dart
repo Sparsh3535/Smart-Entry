@@ -12,16 +12,29 @@ class HostelManager {
 
   List<Map<String, dynamic>> get rows => _hostelRows;
 
+  HostelManager() {
+    debugPrint('[HOSTEL MANAGER INIT] Manager created');
+    debugPrint('[HOSTEL MANAGER INIT] notifier value: ${notifier.value}');
+  }
+
   /// Insert or update hostel rows:
   /// - first scan should fill OUT time
   /// - second scan should fill IN time
   /// - if both present, start a new session (again OUT first)
   void addOrUpdateRow(Map<String, dynamic> fields) {
+    _log('[HOSTEL MANAGER] addOrUpdateRow() called');
+    _log('[HOSTEL MANAGER] Received fields:');
+    _log('[HOSTEL MANAGER] $fields');
+
     final name = fields['name'] as String?;
     final id = fields['id'] as String?;
     final phone = fields['phone'] as String?;
 
+    _log('[HOSTEL MANAGER] name=$name, id=$id, phone=$phone');
+    _log('[HOSTEL MANAGER] Current total rows: ${_hostelRows.length}');
+
     final existingIndex = findExistingRowIndex(_hostelRows, id, phone, name);
+    _log('[HOSTEL MANAGER] Found existing row at index: $existingIndex');
 
     if (existingIndex >= 0) {
       final r = _hostelRows[existingIndex];
@@ -53,37 +66,60 @@ class HostelManager {
         );
       } else {
         // both intime + outtime present -> start a new session with OUT filled first
-        final newRow = <String, dynamic>{
-          'name': r['name'],
-          'id': r['id'],
-          'phone': r['phone'],
-          'location': fields['location'] ?? r['location'],
-          'intime': null,
-          'outtime': now,
-          'security': null,
-        };
+        final newRow = Map<String, dynamic>.from(r);
+        newRow['location'] = fields['location'] ?? r['location'];
+        newRow['intime'] = null;
+        newRow['outtime'] = now;
+        newRow['security'] = null;
         _hostelRows.add(newRow);
         logCallback?.call(
           'Hostel: started new session (outtime=$now) for id=${id ?? phone ?? name}',
         );
       }
+      _log('[HOSTEL MANAGER] Updates done, setting notifier...');
+      debugPrint(
+        '[HOSTEL MANAGER DEBUG] About to set notifier.value for existing row',
+      );
       notifier.value = List<Map<String, dynamic>>.from(_hostelRows);
+      debugPrint(
+        '[HOSTEL MANAGER DEBUG] ✓ Notifier.value set to: ${notifier.value}',
+      );
+      _log(
+        '[HOSTEL MANAGER] ✓ Notifier updated with ${notifier.value.length} rows',
+      );
+      _log('[HOSTEL MANAGER] Notifier value: ${notifier.value}');
       return;
     }
 
-    // not found -> add with outtime set (first scan)
-    final normalized = <String, dynamic>{
-      'name': name,
-      'id': id,
-      'phone': phone,
-      'location': fields['location'],
-      'intime': null,
-      'outtime': shortDateTime(DateTime.now()),
-      'security': null,
-    };
+    // not found -> add with outtime set (first scan, preserve all incoming fields)
+    final normalized = Map<String, dynamic>.from(fields);
+    normalized['intime'] = null;
+    normalized['outtime'] = shortDateTime(DateTime.now());
+    normalized['security'] = null;
+    _log('[HOSTEL MANAGER] Creating new row: $normalized');
     _hostelRows.add(normalized);
+    debugPrint(
+      '[HOSTEL MANAGER DEBUG] Added to _hostelRows, count: ${_hostelRows.length}',
+    );
+    _log(
+      '[HOSTEL MANAGER] ✓ Added new entry. Total rows now: ${_hostelRows.length}',
+    );
     logCallback?.call('Hostel: added new entry for id=${id ?? phone ?? name}');
+    _log('[HOSTEL MANAGER] Setting notifier with new data...');
+    debugPrint('[HOSTEL MANAGER DEBUG] About to set notifier.value');
     notifier.value = List<Map<String, dynamic>>.from(_hostelRows);
+    debugPrint(
+      '[HOSTEL MANAGER DEBUG] ✓ Notifier.value set to: ${notifier.value}',
+    );
+    _log(
+      '[HOSTEL MANAGER] ✓ Notifier updated with ${notifier.value.length} rows',
+    );
+    _log('[HOSTEL MANAGER] Notifier value: ${notifier.value}');
+  }
+
+  /// Helper method for logging
+  void _log(String message) {
+    logCallback?.call(message);
   }
 
   void clear() {

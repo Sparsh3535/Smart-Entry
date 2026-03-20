@@ -17,11 +17,18 @@ class DayScholarManager {
   /// - next scan for same person -> set 'outtime'
   /// - if both already present, start a new session (new row with intime)
   void addOrUpdateRow(Map<String, dynamic> fields) {
+    _log('[DAY SCHOLAR MANAGER] addOrUpdateRow() called');
+    _log('[DAY SCHOLAR MANAGER] Received fields: $fields');
+
     final String? name = fields['name'] as String?;
     final String? id = fields['id'] as String?;
     final String? phone = fields['phone'] as String?;
 
+    _log('[DAY SCHOLAR MANAGER] name=$name, id=$id, phone=$phone');
+    _log('[DAY SCHOLAR MANAGER] Current total rows: ${_dayRows.length}');
+
     final existingIndex = findExistingRowIndex(_dayRows, id, phone, name);
+    _log('[DAY SCHOLAR MANAGER] Found existing row at index: $existingIndex');
 
     if (existingIndex >= 0) {
       final r = _dayRows[existingIndex];
@@ -45,39 +52,48 @@ class DayScholarManager {
         );
       } else {
         // both intime+outtime present -> start a new session with new intime
-        final newRow = <String, dynamic>{
-          'name': r['name'],
-          'id': r['id'],
-          'phone': r['phone'],
-          'location': r['location'],
-          'intime': now,
-          'outtime': null,
-          'security': null,
-        };
+        final newRow = Map<String, dynamic>.from(r);
+        newRow['intime'] = now;
+        newRow['outtime'] = null;
+        newRow['security'] = null;
         _dayRows.add(newRow);
         logCallback?.call(
           'DayScholar: started new session (intime=$now) for id=${id ?? phone ?? name}',
         );
       }
+      _log('[DAY SCHOLAR MANAGER] Updates done, setting notifier...');
       notifier.value = List<Map<String, dynamic>>.from(_dayRows);
+      _log(
+        '[DAY SCHOLAR MANAGER] ✓ Notifier updated with ${notifier.value.length} rows',
+      );
+      _log('[DAY SCHOLAR MANAGER] Notifier value: ${notifier.value}');
       return;
     }
 
-    // not found -> add with intime set
-    final normalized = <String, dynamic>{
-      'name': name,
-      'id': id,
-      'phone': phone,
-      'location': fields['location'],
-      'intime': shortDateTime(DateTime.now()),
-      'outtime': null,
-      'security': null,
-    };
+    // not found -> add with intime set (preserve all incoming fields)
+    final normalized = Map<String, dynamic>.from(fields);
+    normalized['intime'] = shortDateTime(DateTime.now());
+    normalized['outtime'] = null;
+    normalized['security'] = null;
+    _log('[DAY SCHOLAR MANAGER] Creating new row: $normalized');
     _dayRows.add(normalized);
+    _log(
+      '[DAY SCHOLAR MANAGER] ✓ Added new entry. Total rows now: ${_dayRows.length}',
+    );
     logCallback?.call(
       'DayScholar: added new entry for id=${id ?? phone ?? name}',
     );
+    _log('[DAY SCHOLAR MANAGER] Setting notifier with new data...');
     notifier.value = List<Map<String, dynamic>>.from(_dayRows);
+    _log(
+      '[DAY SCHOLAR MANAGER] ✓ Notifier updated with ${notifier.value.length} rows',
+    );
+    _log('[DAY SCHOLAR MANAGER] Notifier value: ${notifier.value}');
+  }
+
+  /// Helper method for logging
+  void _log(String message) {
+    logCallback?.call(message);
   }
 
   void clear() {

@@ -78,14 +78,27 @@ class QRAuthenticator {
     }
   }
 
+  /// Process a Map directly (no JSON encode/decode round-trip needed).
+  /// Use this when data is already a Map (e.g. from Firebase).
+  void processMap(Map<String, dynamic> data) {
+    _log('Processing map directly (${data.length} keys)');
+    _processData(data);
+  }
+
   /// Process and route data to appropriate manager based on type or content
   void _processData(dynamic obj) {
+    _log('[QRAUTHENTCATOR] _processData() called');
+    _log('[QRAUTHENTCATOR] Input object type: ${obj.runtimeType}');
+
     Map<String, dynamic> raw;
     if (obj is Map<String, dynamic>) {
       raw = Map<String, dynamic>.from(obj);
     } else {
       raw = {'value': obj?.toString()};
     }
+
+    _log('[QRAUTHENTCATOR] Raw data after initial processing:');
+    _log('[QRAUTHENTCATOR] $raw');
 
     // If value contains key:value block, parse and merge into raw
     final kvFromValue = parseKeyValueBlock(raw['value'] ?? raw);
@@ -107,11 +120,17 @@ class QRAuthenticator {
       });
     }
 
+    _log('[QRAUTHENTCATOR] About to route data by type...');
     // If this data has a Type and it routes to leave/day/hostel, let routing handle it.
-    if (_routeByType(raw)) return;
+    if (_routeByType(raw)) {
+      _log('[QRAUTHENTCATOR] ✓ Data routed successfully');
+      return;
+    }
 
     // Default: unrouted data
-    _log('Unrouted data: ${raw.toString().substring(0, 100)}');
+    _log(
+      '[QRAUTHENTCATOR] ⚠ Unrouted data: ${raw.toString().substring(0, 100)}',
+    );
   }
 
   /// Route incoming raw map/text by its Type key
@@ -124,17 +143,20 @@ class QRAuthenticator {
     if (type == null) return false;
     final t = type.toLowerCase();
 
+    _log('[TYPE ROUTING] Detected type: "$type" (normalized: "$t")');
+
     // prefer possible value string for leave parsing
     final possibleValue = raw['value'] ?? kv['value'];
 
     // ===== LEAVE =====
     if (t.contains('leave')) {
+      _log('[TYPE ROUTING] → Routing to LEAVE APPLICATIONS MANAGER');
       final pl =
           leaveManager.parseLeaveApplication(raw) ??
           leaveManager.parseLeaveApplication(possibleValue);
       if (pl != null) {
         leaveManager.addLeaveApplication(pl);
-        _log('Routed to Leave Applications');
+        _log('✓ Routed to Leave Applications');
         return true;
       }
       return false;
@@ -142,51 +164,39 @@ class QRAuthenticator {
 
     // ===== HOSTEL =====
     if (t.contains('hostel') || t.contains('hosteller')) {
-      final name = firstString(raw, ['name', 'Name']) ?? kv['name'];
-      final id =
-          firstString(raw, ['id', 'Id', 'roll', 'roll_no', 'rollno']) ??
-          kv['roll number'] ??
-          kv['roll'];
-      final phone =
-          firstString(raw, ['phone', 'Phone', 'mobile']) ??
-          kv['phone number'] ??
-          kv['phone'];
-      final location =
-          firstString(raw, ['location', 'Location', 'address']) ??
-          kv['location'];
-      final minimal = <String, dynamic>{
-        'name': name,
-        'id': id,
-        'phone': phone,
-        'location': location,
-      };
-      hostelManager.addOrUpdateRow(minimal);
-      _log('Routed to Hostel');
+      _log('[TYPE ROUTING] → Routing to HOSTEL MANAGER');
+      _log('[HOSTEL ROUTE] Full data received: $raw');
+
+      // Ensure key fields are populated from kv fallback
+      raw['name'] ??= kv['name'];
+      raw['id'] ??= kv['roll number'] ?? kv['roll'];
+      raw['phone'] ??= kv['phone number'] ?? kv['phone'];
+      raw['location'] ??= kv['location'];
+
+      _log('[HOSTEL ROUTE] Full data being passed to hostel manager:');
+      _log('[HOSTEL ROUTE] $raw');
+
+      hostelManager.addOrUpdateRow(raw);
+      _log('✓ Routed to Hostel (name: ${raw['name']}, id: ${raw['id']})');
       return true;
     }
 
     // ===== DAY SCHOLAR =====
     if (t.contains('day') || t.contains('scholar')) {
-      final name = firstString(raw, ['name', 'Name']) ?? kv['name'];
-      final id =
-          firstString(raw, ['id', 'Id', 'roll', 'roll_no', 'rollno']) ??
-          kv['roll number'] ??
-          kv['roll'];
-      final phone =
-          firstString(raw, ['phone', 'Phone', 'mobile']) ??
-          kv['phone number'] ??
-          kv['phone'];
-      final location =
-          firstString(raw, ['location', 'Location', 'address']) ??
-          kv['location'];
-      final minimal = <String, dynamic>{
-        'name': name,
-        'id': id,
-        'phone': phone,
-        'location': location,
-      };
-      dayScholarManager.addOrUpdateRow(minimal);
-      _log('Routed to Day Scholar');
+      _log('[TYPE ROUTING] → Routing to DAY SCHOLAR MANAGER');
+      _log('[DAY SCHOLAR ROUTE] Full data received: $raw');
+
+      // Ensure key fields are populated from kv fallback
+      raw['name'] ??= kv['name'];
+      raw['id'] ??= kv['roll number'] ?? kv['roll'];
+      raw['phone'] ??= kv['phone number'] ?? kv['phone'];
+      raw['location'] ??= kv['location'];
+
+      _log('[DAY SCHOLAR ROUTE] Full data being passed to day scholar manager:');
+      _log('[DAY SCHOLAR ROUTE] $raw');
+
+      dayScholarManager.addOrUpdateRow(raw);
+      _log('✓ Routed to Day Scholar (name: ${raw['name']}, id: ${raw['id']})');
       return true;
     }
 

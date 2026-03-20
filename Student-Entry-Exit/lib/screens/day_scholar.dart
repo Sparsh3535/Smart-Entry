@@ -122,6 +122,7 @@ class DayScholarScreen extends StatelessWidget {
                               final location = _cell(r, [
                                 'location',
                                 'Location',
+                                'comingFrom',
                                 'address',
                               ]);
                               final intime = _cell(r, [

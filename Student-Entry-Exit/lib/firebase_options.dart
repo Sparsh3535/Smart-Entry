@@ -9,10 +9,10 @@ class DefaultFirebaseOptions {
   }
 
   static const FirebaseOptions windows = FirebaseOptions(
-    apiKey: 'AIzaSyDqlf7wqLSe_example', // Replace with your API key
+    apiKey: 'LXd3KEvnT4OqwOB-OiAji71f8q3jAJng0HLKslu_V30',
     projectId: 'nit-goa-gate-system',
-    messagingSenderId: '123456789',
-    appId: '1:123456789:web:abcdef1234567890',
+    messagingSenderId: '788131250494',
+    appId: '1:788131250494:web:d21d8ff23ad4624be06c6f',
     // Leave these empty for desktop only - they're for web/mobile
     authDomain: '',
     databaseURL: '',
@@ -20,37 +20,37 @@ class DefaultFirebaseOptions {
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDqlf7wqLSe_example', // Replace with Android key
+    apiKey: 'LXd3KEvnT4OqwOB-OiAji71f8q3jAJng0HLKslu_V30',
     projectId: 'nit-goa-gate-system',
-    messagingSenderId: '123456789',
-    appId: '1:123456789:android:abcdef1234567890',
+    messagingSenderId: '788131250494',
+    appId: '1:788131250494:android:c0e60820a2417134e06c6f',
     databaseURL: '',
     storageBucket: 'nit-goa-gate-system.appspot.com',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDqlf7wqLSe_example', // Replace with iOS key
+    apiKey: 'LXd3KEvnT4OqwOB-OiAji71f8q3jAJng0HLKslu_V30',
     projectId: 'nit-goa-gate-system',
-    messagingSenderId: '123456789',
-    appId: '1:123456789:ios:abcdef1234567890',
+    messagingSenderId: '788131250494',
+    appId: '1:788131250494:ios:8ba17a0784881d14e06c6f',
     databaseURL: '',
     storageBucket: 'nit-goa-gate-system.appspot.com',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyDqlf7wqLSe_example', // Replace with macOS key
+    apiKey: 'LXd3KEvnT4OqwOB-OiAji71f8q3jAJng0HLKslu_V30',
     projectId: 'nit-goa-gate-system',
-    messagingSenderId: '123456789',
-    appId: '1:123456789:macos:abcdef1234567890',
+    messagingSenderId: '788131250494',
+    appId: '1:788131250494:ios:8ba17a0784881d14e06c6f',
     databaseURL: '',
     storageBucket: 'nit-goa-gate-system.appspot.com',
   );
 
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDqlf7wqLSe_example', // Replace with Web key
+    apiKey: 'LXd3KEvnT4OqwOB-OiAji71f8q3jAJng0HLKslu_V30',
     projectId: 'nit-goa-gate-system',
-    messagingSenderId: '123456789',
-    appId: '1:123456789:web:abcdef1234567890',
+    messagingSenderId: '788131250494',
+    appId: '1:788131250494:web:d21d8ff23ad4624be06c6f',
     authDomain: 'nit-goa-gate-system.firebaseapp.com',
     databaseURL: 'https://nit-goa-gate-system.firebasedatabase.app',
     storageBucket: 'nit-goa-gate-system.appspot.com',

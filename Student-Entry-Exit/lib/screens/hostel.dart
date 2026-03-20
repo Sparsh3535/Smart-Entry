@@ -28,9 +28,18 @@ class HostelScreen extends StatelessWidget {
             child: ValueListenableBuilder<List<Map<String, dynamic>>>(
               valueListenable: rowsListenable,
               builder: (context, rows, _) {
+                debugPrint('[HOSTEL SCREEN] ValueListenableBuilder triggered');
+                debugPrint('[HOSTEL SCREEN] rows.length: ${rows.length}');
+                debugPrint('[HOSTEL SCREEN] rows content: $rows');
+
                 if (rows.isEmpty) {
+                  debugPrint(
+                    '[HOSTEL SCREEN] ⚠ No rows, showing empty message',
+                  );
                   return const Center(child: Text('No hostel entries yet.'));
                 }
+
+                debugPrint('[HOSTEL SCREEN] ✓ Rendering ${rows.length} rows');
                 return SingleChildScrollView(
                   scrollDirection: Axis.horizontal,
                   child: Builder(

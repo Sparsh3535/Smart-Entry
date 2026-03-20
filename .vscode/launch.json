@@ -1,0 +1,88 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Student-Entry-Exit",
+            "cwd": "Student-Entry-Exit",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "Student-Entry-Exit (profile mode)",
+            "cwd": "Student-Entry-Exit",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "Student-Entry-Exit (release mode)",
+            "cwd": "Student-Entry-Exit",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "qr_scanner_desktop",
+            "cwd": "Student-Entry-Exit\\qr_scanner_desktop",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "qr_scanner_desktop (profile mode)",
+            "cwd": "Student-Entry-Exit\\qr_scanner_desktop",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "qr_scanner_desktop (release mode)",
+            "cwd": "Student-Entry-Exit\\qr_scanner_desktop",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "qr_scanner_desktop-1",
+            "cwd": "Student-Entry-Exit\\qr_scanner_desktop-1",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "qr_scanner_desktop-1 (profile mode)",
+            "cwd": "Student-Entry-Exit\\qr_scanner_desktop-1",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "qr_scanner_desktop-1 (release mode)",
+            "cwd": "Student-Entry-Exit\\qr_scanner_desktop-1",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        },
+        {
+            "name": "qr_scanner_desktop-2",
+            "cwd": "Student-Entry-Exit\\qr_scanner_desktop-2",
+            "request": "launch",
+            "type": "dart"
+        },
+        {
+            "name": "qr_scanner_desktop-2 (profile mode)",
+            "cwd": "Student-Entry-Exit\\qr_scanner_desktop-2",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "profile"
+        },
+        {
+            "name": "qr_scanner_desktop-2 (release mode)",
+            "cwd": "Student-Entry-Exit\\qr_scanner_desktop-2",
+            "request": "launch",
+            "type": "dart",
+            "flutterMode": "release"
+        }
+    ]
+}
