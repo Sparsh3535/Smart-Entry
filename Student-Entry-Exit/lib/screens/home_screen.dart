@@ -8,6 +8,7 @@ import '../managers/day_scholar_manager.dart';
 import '../managers/hostel_manager.dart';
 import '../managers/leave_applications_manager.dart';
 import '../managers/qr_authenticator.dart';
+import '../managers/firebase_service.dart';
 import 'day_scholar.dart';
 import 'leave_applications.dart';
 import 'hostel.dart';
@@ -26,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
   late final LeaveApplicationsManager _leaveManager =
       LeaveApplicationsManager();
   late final QRAuthenticator _qrAuthenticator;
+  final FirebaseService _firebaseService = FirebaseService();
 
   ServerSocket? _server;
   bool _listening = false;
@@ -140,16 +142,14 @@ class _HomeScreenState extends State<HomeScreen> {
         final chunk = utf8.decode(data, allowMalformed: true);
         buffer += chunk;
 
-        _qrAuthenticator.processBuffer(
-          bufferHolder: () => buffer,
-          bufferSetter: (s) => buffer = s,
-          clientAddr: client.remoteAddress.address,
-        );
+        _processBuffer(buffer, (newBuffer) {
+          buffer = newBuffer;
+        });
       },
       onDone: () {
         _log('Client disconnected: ${client.remoteAddress.address}');
         if (buffer.trim().isNotEmpty) {
-          _qrAuthenticator.processLine(buffer.trim());
+          _processBufferLine(buffer.trim());
           buffer = '';
         }
       },
@@ -158,6 +158,69 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       cancelOnError: true,
     );
+  }
+
+  /// Process buffer and extract complete lines
+  void _processBuffer(String buffer, void Function(String) setBuffer) {
+    String buf = buffer;
+    while (buf.isNotEmpty) {
+      final nlIndex = buf.indexOf('\n');
+      if (nlIndex >= 0) {
+        final line = buf.substring(0, nlIndex).trim();
+        if (line.isNotEmpty) _processBufferLine(line);
+        buf = buf.substring(nlIndex + 1);
+        continue;
+      }
+      break;
+    }
+    setBuffer(buf);
+  }
+
+  /// Process individual line - either JSON or Firebase key lookup
+  void _processBufferLine(String line) async {
+    if (line.isEmpty) return;
+
+    _log('Processing received data (${line.length} chars): ${line.length > 200 ? '${line.substring(0, 200)}...' : line}');
+
+    // Check if it's JSON (starts with { or [)
+    if (line.trim().startsWith('{') || line.trim().startsWith('[')) {
+      _log('Detected JSON format - passing to QRAuthenticator');
+      _qrAuthenticator.processLine(line);
+      return;
+    }
+
+    // Check if it's a simple rollno key (alphanumeric, possibly with underscores/hyphens)
+    final simpleKeyPattern = RegExp(r'^[a-zA-Z0-9_\-]+$');
+    if (simpleKeyPattern.hasMatch(line)) {
+      _log('Detected rollno key format: "$line" - fetching from Firebase');
+      await _fetchAndProcessFromFirebase(line);
+      return;
+    }
+
+    // Otherwise, treat as raw data and pass to QRAuthenticator
+    _log('Treating as raw data - passing to QRAuthenticator');
+    _qrAuthenticator.processLine(line);
+  }
+
+  /// Fetch student data from Firebase by rollno and process it
+  Future<void> _fetchAndProcessFromFirebase(String rollNo) async {
+    try {
+      final studentData = await _firebaseService.fetchStudentByRollNo(rollNo);
+
+      if (studentData != null) {
+        _log('✓ Firebase lookup successful for rollno: $rollNo');
+        _log('Fetched data type: ${studentData['type']}');
+        
+        // Convert the fetched data to JSON and pass to QRAuthenticator
+        // This ensures the same processing pipeline
+        final jsonData = jsonEncode(studentData);
+        _qrAuthenticator.processLine(jsonData);
+      } else {
+        _log('✗ No student found in Firebase for rollno: $rollNo');
+      }
+    } catch (e) {
+      _log('✗ Firebase lookup failed for rollno "$rollNo": $e');
+    }
   }
 
   void _clear() {
@@ -192,54 +255,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-            ),
-            ListTile(
-              leading: const Icon(Icons.assignment),
-              title: const Text('Leave Applications'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => LeaveApplicationsScreen(
-                      applicationsListenable: _leaveManager.notifier,
-                    ),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.code),
-              title: const Text('Console'),
-              onTap: () {
-                Navigator.of(context).pop();
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.table_chart),
-              title: const Text('Hostel'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) =>
-                        HostelScreen(rowsListenable: _hostelManager.notifier),
-                  ),
-                );
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('Day scholar'),
-              onTap: () {
-                Navigator.of(context).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => DayScholarScreen(
-                      applicationsListenable: _dayScholarManager.notifier,
-                    ),
-                  ),
-                );
-              },
             ),
             ListTile(
               leading: const Icon(Icons.lock),
