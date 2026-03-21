@@ -41,7 +41,11 @@ class FirebaseService {
           final gatePassData = gatePassDoc.data() as Map<String, dynamic>;
           print('[Firebase Service] ✓ Found in gate_passes collection');
           print('[Firebase Service] Raw data: $gatePassData');
-          final normalized = _normalizeGatePassData(gatePassData);
+          // Use the correct normalizer based on the document's type
+          final docType = (gatePassData['type']?.toString() ?? '').toLowerCase();
+          final normalized = docType.contains('leave')
+              ? _normalizeLeaveRequestData(gatePassData)
+              : _normalizeGatePassData(gatePassData);
           print('[Firebase Service] Normalized data: $normalized');
 
           // Check if critical fields are populated
@@ -227,6 +231,61 @@ class FirebaseService {
     };
   }
 
+  /// Format a Firestore Timestamp or date string to dd-MM-yyyy
+  String _formatTimestampToDate(dynamic value) {
+    if (value == null) return '';
+
+    DateTime? dt;
+
+    // Handle Firestore Timestamp
+    if (value is Timestamp) {
+      dt = value.toDate();
+    }
+
+    // Handle string like "March 21, 2026 at 12:00:00 AM UTC+5:30"
+    if (dt == null && value is String && value.trim().isNotEmpty) {
+      // Try common date patterns
+      final patterns = [
+        // "March 21, 2026 at ..."
+        RegExp(r'(\w+)\s+(\d{1,2}),?\s+(\d{4})'),
+        // "21/03/2026" or "21-03-2026"
+        RegExp(r'(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})'),
+      ];
+
+      final months = {
+        'january': 1, 'february': 2, 'march': 3, 'april': 4,
+        'may': 5, 'june': 6, 'july': 7, 'august': 8,
+        'september': 9, 'october': 10, 'november': 11, 'december': 12,
+      };
+
+      for (final pattern in patterns) {
+        final match = pattern.firstMatch(value);
+        if (match != null) {
+          if (months.containsKey(match.group(1)?.toLowerCase())) {
+            // "Month Day, Year" format
+            final month = months[match.group(1)!.toLowerCase()]!;
+            final day = int.tryParse(match.group(2)!) ?? 1;
+            final year = int.tryParse(match.group(3)!) ?? 2026;
+            dt = DateTime(year, month, day);
+          } else {
+            // "dd/mm/yyyy" format
+            final day = int.tryParse(match.group(1)!) ?? 1;
+            final month = int.tryParse(match.group(2)!) ?? 1;
+            final year = int.tryParse(match.group(3)!) ?? 2026;
+            dt = DateTime(year, month, day);
+          }
+          break;
+        }
+      }
+    }
+
+    if (dt == null) return value.toString();
+
+    // Format as dd-MM-yyyy
+    String two(int n) => n.toString().padLeft(2, '0');
+    return '${two(dt.day)}-${two(dt.month)}-${dt.year}';
+  }
+
   /// Normalize leave_requests data to QRAuthenticator format
   Map<String, dynamic> _normalizeLeaveRequestData(Map<String, dynamic> data) {
     // Extract rollno and name from combined name field if available
@@ -234,15 +293,30 @@ class FirebaseService {
       data['name']?.toString() ?? '',
     );
 
-    // Use parsed values if available and original fields are empty
-    final String rollno = (data['rollno']?.toString() ?? '').isEmpty
-        ? parsedName['rollno']!
-        : data['rollno']?.toString() ?? '';
+    // Use rollNumber or rollno from Firebase, fall back to parsed name
+    final String rollno = (data['rollNumber']?.toString() ?? '').isNotEmpty
+        ? data['rollNumber'].toString()
+        : (data['rollno']?.toString() ?? '').isNotEmpty
+            ? data['rollno'].toString()
+            : parsedName['rollno']!;
 
     // Always use parsed name (just the name part, not rollno_name)
     final String name = parsedName['name']!.isNotEmpty
         ? parsedName['name']!
         : data['name']?.toString() ?? '';
+
+    // Address: use addressDuringLeave (actual Firebase field), fall back to address
+    final String address = (data['addressDuringLeave']?.toString() ?? '').isNotEmpty
+        ? data['addressDuringLeave'].toString()
+        : data['address']?.toString() ?? '';
+
+    // Dates: use leavingDate/returnDate (Firestore Timestamps), fall back to leaving/returning
+    final String leaving = _formatTimestampToDate(
+      data['leavingDate'] ?? data['leaving'],
+    );
+    final String returning = _formatTimestampToDate(
+      data['returnDate'] ?? data['returning'],
+    );
 
     return {
       'type': 'leave',
@@ -250,13 +324,15 @@ class FirebaseService {
       'id': rollno,
       'rollno': rollno,
       'phone': data['phone']?.toString() ?? '',
-      'leaving': data['leaving']?.toString() ?? '',
-      'returning': data['returning']?.toString() ?? '',
-      'duration': data['duration']?.toString() ?? '',
-      'address': data['address']?.toString() ?? '',
+      'leaving': leaving,
+      'returning': returning,
+      'duration': (data['durationDays']?.toString() ?? '').isNotEmpty
+          ? '${data['durationDays']} days'
+          : data['duration']?.toString() ?? '',
+      'address': address,
       'reason': data['reason']?.toString() ?? '',
       'status': data['status']?.toString() ?? 'pending',
-      'location': data['address']?.toString() ?? '',
+      'location': address,
       'createdAt': data['createdAt'] ?? '',
       'security': null,
     };

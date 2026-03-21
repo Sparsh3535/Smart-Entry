@@ -46,7 +46,7 @@ class HostelScreen extends StatelessWidget {
                     builder: (ctx) {
                       final screenWidth = MediaQuery.of(ctx).size.width - 48;
                       final minW = screenWidth;
-                      final colCount = 7; // fixed columns
+                      final colCount = 8; // fixed columns
                       final columnSpacing = math.max(
                         12.0,
                         (minW / math.max(1, colCount).toDouble()) * 0.7,
@@ -74,6 +74,12 @@ class HostelScreen extends StatelessWidget {
                               DataColumn(
                                 label: Text(
                                   'Phone',
+                                  style: TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  'Room Number',
                                   style: TextStyle(fontWeight: FontWeight.bold),
                                 ),
                               ),
@@ -123,9 +129,15 @@ class HostelScreen extends StatelessWidget {
                                 'mobile',
                                 'Phone Number',
                               ]);
+                              final roomNumber = _cell(r, [
+                                'roomNumber',
+                                'room_number',
+                                'RoomNumber',
+                              ]);
                               final location = _cell(r, [
                                 'location',
                                 'Location',
+                                'comingFrom',
                                 'address',
                               ]);
                               final intime = _cell(r, [
@@ -205,6 +217,9 @@ class HostelScreen extends StatelessWidget {
                                   ),
                                   DataCell(
                                     SelectableText(phone, style: cellStyle),
+                                  ),
+                                  DataCell(
+                                    SelectableText(roomNumber, style: cellStyle),
                                   ),
                                   DataCell(
                                     SelectableText(location, style: cellStyle),
