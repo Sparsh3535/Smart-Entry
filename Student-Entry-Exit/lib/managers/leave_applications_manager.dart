@@ -39,10 +39,11 @@ class LeaveApplicationsManager {
           'name': low['name'] ?? '',
           'id': low['roll number'] ?? low['roll'] ?? low['id'] ?? '',
           'phone': low['phone number'] ?? low['phone'] ?? '',
+          'roomNumber': low['roomnumber'] ?? low['room_number'] ?? '',
           'leaving': low['leaving'] ?? '',
           'returning': low['returning'] ?? '',
           'duration': low['duration'] ?? '',
-          'address': low['address'] ?? '',
+          'address': low['address'] ?? low['addressduringleave'] ?? '',
           'receivedAt': shortDateTime(DateTime.now()),
         };
       }
@@ -76,6 +77,7 @@ class LeaveApplicationsManager {
         'name': map['name'] ?? '',
         'id': map['roll number'] ?? map['roll'] ?? map['id'] ?? '',
         'phone': map['phone number'] ?? map['phone'] ?? '',
+        'roomNumber': map['roomnumber'] ?? map['room_number'] ?? '',
         'leaving': map['leaving'] ?? '',
         'returning': map['returning'] ?? '',
         'duration': map['duration'] ?? '',

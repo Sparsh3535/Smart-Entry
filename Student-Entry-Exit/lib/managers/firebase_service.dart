@@ -324,6 +324,7 @@ class FirebaseService {
       'id': rollno,
       'rollno': rollno,
       'phone': data['phone']?.toString() ?? '',
+      'roomNumber': data['roomNumber']?.toString() ?? '',
       'leaving': leaving,
       'returning': returning,
       'duration': (data['durationDays']?.toString() ?? '').isNotEmpty

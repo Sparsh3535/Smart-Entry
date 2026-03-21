@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
 
 class LeaveApplicationsScreen extends StatelessWidget {
   // Changed from List to ValueListenable
@@ -9,10 +10,10 @@ class LeaveApplicationsScreen extends StatelessWidget {
     required this.applicationsListenable,
   });
 
-  String _first(Map<String, dynamic> a, List<String> keys) {
+  String _cell(Map<String, dynamic> row, List<String> keys) {
     for (final k in keys) {
-      if (a.containsKey(k) && a[k] != null) {
-        final s = a[k].toString().trim();
+      if (row.containsKey(k) && row[k] != null) {
+        final s = row[k].toString().trim();
         if (s.isNotEmpty) return s;
       }
     }
@@ -20,7 +21,7 @@ class LeaveApplicationsScreen extends StatelessWidget {
   }
 
   bool _isLeave(Map<String, dynamic> a) {
-    final type = _first(a, ['type', 'Type']).toLowerCase();
+    final type = _cell(a, ['type', 'Type']).toLowerCase();
     if (type.contains('leave')) return true;
     final hasLeaving = a.keys.any(
       (k) => k.toString().toLowerCase().contains('leaving'),
@@ -31,182 +32,256 @@ class LeaveApplicationsScreen extends StatelessWidget {
     return hasLeaving || hasReturning;
   }
 
-  String _formatDateTime(String? s) {
-    if (s == null) return '';
-    final re = RegExp(
-      r'(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{4})\s*(?:at\s*)?(\d{1,2}:\d{2})?',
-      caseSensitive: false,
-    );
-    final m = re.firstMatch(s);
-    if (m != null) {
-      final date = m.group(1)!;
-      final time = m.group(2);
-      return time == null ? date : '$date at $time';
-    }
-    return s.trim();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final columns = <String>[
-      'Name',
-      'Roll Number',
-      'Phone Number',
-      'Leaving',
-      'Returning',
-      'Duration',
-      'Address',
-      'Received',
-    ];
-
     return Scaffold(
       appBar: AppBar(title: const Text('Leave Applications')),
       body: Padding(
-        padding: const EdgeInsets.all(12.0),
-        // Added ValueListenableBuilder here
-        child: ValueListenableBuilder<List<Map<String, dynamic>>>(
-          valueListenable: applicationsListenable,
-          builder: (context, allApplications, _) {
-            final leaves = allApplications.where((a) => _isLeave(a)).toList();
+        padding: const EdgeInsets.all(16.0),
+        child: Card(
+          child: Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: ValueListenableBuilder<List<Map<String, dynamic>>>(
+              valueListenable: applicationsListenable,
+              builder: (context, allApplications, _) {
+                final leaves =
+                    allApplications.where((a) => _isLeave(a)).toList();
 
-            if (leaves.isEmpty) {
-              return const Center(
-                child: Text('No leave applications received yet.'),
-              );
-            }
+                if (leaves.isEmpty) {
+                  return const Center(
+                    child: Text('No leave applications received yet.'),
+                  );
+                }
 
-            return SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(minWidth: 900),
-                child: SingleChildScrollView(
-                  child: DataTable(
-                    columnSpacing: 24,
-                    headingRowHeight: 56,
-                    dataRowHeight: 56,
-                    columns: columns
-                        .map(
-                          (c) => DataColumn(
-                            label: Text(
-                              c,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
+                return SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Builder(
+                    builder: (ctx) {
+                      final screenWidth =
+                          MediaQuery.of(ctx).size.width - 48;
+                      final minW = screenWidth;
+                      final colCount = 9; // fixed columns
+                      final columnSpacing = math.max(
+                        12.0,
+                        (minW / math.max(1, colCount).toDouble()) * 0.7,
+                      );
+                      return ConstrainedBox(
+                        constraints: BoxConstraints(minWidth: minW),
+                        child: SingleChildScrollView(
+                          child: DataTable(
+                            columnSpacing: columnSpacing,
+                            headingRowHeight: 64,
+                            dataRowHeight: 64,
+                            columns: const [
+                              DataColumn(
+                                label: Text(
+                                  'Name',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
                               ),
-                            ),
-                          ),
-                        )
-                        .toList(),
-                    rows: leaves.map((a) {
-                      final name = _first(a, [
-                        'name',
-                        'Name',
-                        'full name',
-                        'fullname',
-                      ]);
-                      final roll = _first(a, [
-                        'roll number',
-                        'Roll Number',
-                        'roll',
-                        'id',
-                        'Id',
-                      ]);
-                      final phone = _first(a, [
-                        'phone number',
-                        'Phone Number',
-                        'phone',
-                        'mobile',
-                      ]);
-                      final leaving = _formatDateTime(
-                        _first(a, ['leaving', 'Leaving', 'from']),
-                      );
-                      final returning = _formatDateTime(
-                        _first(a, ['returning', 'Returning', 'to']),
-                      );
-                      final duration = _first(a, ['duration', 'Duration']);
-                      final address = _first(a, [
-                        'address',
-                        'Address',
-                        'location',
-                        'Location',
-                      ]);
-                      final received = _first(a, [
-                        'receivedAt',
-                        'received_at',
-                        'received',
-                      ]);
+                              DataColumn(
+                                label: Text(
+                                  'Roll Number',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  'Phone Number',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  'Room Number',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  'Leaving',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  'Returning',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  'Duration',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  'Address',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                              DataColumn(
+                                label: Text(
+                                  'Received',
+                                  style:
+                                      TextStyle(fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ],
+                            rows: leaves.map((a) {
+                              final name = _cell(a, [
+                                'name',
+                                'Name',
+                                'full name',
+                                'fullname',
+                              ]);
+                              final roll = _cell(a, [
+                                'roll number',
+                                'Roll Number',
+                                'roll',
+                                'id',
+                                'Id',
+                                'rollno',
+                              ]);
+                              final phone = _cell(a, [
+                                'phone number',
+                                'Phone Number',
+                                'phone',
+                                'mobile',
+                              ]);
+                              final roomNumber = _cell(a, [
+                                'roomNumber',
+                                'room_number',
+                                'RoomNumber',
+                              ]);
+                              final leaving = _cell(a, [
+                                'leaving',
+                                'Leaving',
+                                'from',
+                              ]);
+                              final returning = _cell(a, [
+                                'returning',
+                                'Returning',
+                                'to',
+                              ]);
+                              final duration = _cell(a, [
+                                'duration',
+                                'Duration',
+                              ]);
+                              final address = _cell(a, [
+                                'address',
+                                'Address',
+                                'addressDuringLeave',
+                                'location',
+                                'Location',
+                              ]);
+                              final received = _cell(a, [
+                                'receivedAt',
+                                'received_at',
+                                'received',
+                              ]);
 
-                      Widget leavingWidget() {
-                        if (leaving.isEmpty) {
-                          return const Text(
-                            '\u2014',
-                            style: TextStyle(color: Colors.black45),
-                          );
-                        }
-                        return SelectableText(
-                          leaving,
-                          style: const TextStyle(
-                            color: Color(0xFF2E7D32),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      }
-
-                      Widget returningWidget() {
-                        if (returning.isEmpty) {
-                          return const Text(
-                            '\u2014',
-                            style: TextStyle(color: Colors.black45),
-                          );
-                        }
-                        return Text(
-                          returning,
-                          style: const TextStyle(
-                            color: Color(0xFFD32F2F),
-                            fontWeight: FontWeight.w600,
-                          ),
-                        );
-                      }
-
-                      final statusLabel = duration.isNotEmpty
-                          ? 'Duration: $duration'
-                          : '';
-
-                      return DataRow(
-                        cells: [
-                          DataCell(SelectableText(name)),
-                          DataCell(SelectableText(roll)),
-                          DataCell(SelectableText(phone)),
-                          DataCell(leavingWidget()),
-                          DataCell(returningWidget()),
-                          DataCell(SelectableText(duration)),
-                          DataCell(SelectableText(address)),
-                          DataCell(
-                            statusLabel.isEmpty
-                                ? SelectableText(received)
-                                : Row(
-                                    children: [
-                                      SelectableText(received),
-                                      const SizedBox(width: 8),
-                                      Chip(
-                                        label: Text(
-                                          statusLabel,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                        backgroundColor: Colors.amber.shade700,
-                                      ),
-                                    ],
+                              Widget leavingWidget() {
+                                if (leaving.isEmpty) {
+                                  return const Text(
+                                    '\u2014',
+                                    style:
+                                        TextStyle(color: Colors.black45),
+                                  );
+                                }
+                                return SelectableText(
+                                  leaving,
+                                  style: const TextStyle(
+                                    color: Color(0xFF2E7D32),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
                                   ),
+                                );
+                              }
+
+                              Widget returningWidget() {
+                                if (returning.isEmpty) {
+                                  return const Text(
+                                    '\u2014',
+                                    style:
+                                        TextStyle(color: Colors.black45),
+                                  );
+                                }
+                                return Text(
+                                  returning,
+                                  style: const TextStyle(
+                                    color: Color(0xFFD32F2F),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 14,
+                                  ),
+                                );
+                              }
+
+                              Widget durationWidget() {
+                                if (duration.isEmpty) {
+                                  return const SizedBox.shrink();
+                                }
+                                return Chip(
+                                  label: Text(
+                                    duration,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  backgroundColor: Colors.amber.shade700,
+                                );
+                              }
+
+                              const cellStyle = TextStyle(fontSize: 14);
+                              return DataRow(
+                                cells: [
+                                  DataCell(
+                                    SelectableText(name, style: cellStyle),
+                                  ),
+                                  DataCell(
+                                    SelectableText(roll, style: cellStyle),
+                                  ),
+                                  DataCell(
+                                    SelectableText(phone,
+                                        style: cellStyle),
+                                  ),
+                                  DataCell(
+                                    SelectableText(roomNumber,
+                                        style: cellStyle),
+                                  ),
+                                  DataCell(leavingWidget()),
+                                  DataCell(returningWidget()),
+                                  DataCell(durationWidget()),
+                                  DataCell(
+                                    SelectableText(address,
+                                        style: cellStyle),
+                                  ),
+                                  DataCell(
+                                    SelectableText(received,
+                                        style: cellStyle),
+                                  ),
+                                ],
+                              );
+                            }).toList(),
                           ),
-                        ],
+                        ),
                       );
-                    }).toList(),
+                    },
                   ),
-                ),
-              ),
-            );
-          },
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
