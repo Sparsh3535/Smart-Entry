@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'data_utils.dart';
+import 'local_storage_service.dart';
 
 /// Manages leave application data
 class LeaveApplicationsManager {
@@ -99,6 +100,7 @@ class LeaveApplicationsManager {
     );
     logCallback?.call('Leave: added application for ${app['name']}');
     notifier.value = List<Map<String, dynamic>>.from(_leaveApps);
+    _save();
     _log('[LEAVE MANAGER] ✓ Updated notifier');
   }
 
@@ -107,8 +109,25 @@ class LeaveApplicationsManager {
     logCallback?.call(message);
   }
 
+  /// Save current rows to local storage
+  void _save() {
+    LocalStorageService().save('leave', _leaveApps);
+  }
+
+  /// Load previously saved rows from local storage (daily reset applied)
+  Future<void> loadFromStorage() async {
+    final saved = await LocalStorageService().load('leave');
+    if (saved.isNotEmpty) {
+      _leaveApps.clear();
+      _leaveApps.addAll(saved);
+      notifier.value = List<Map<String, dynamic>>.from(_leaveApps);
+      _log('[LEAVE MANAGER] Loaded ${saved.length} rows from storage');
+    }
+  }
+
   void clear() {
     _leaveApps.clear();
     notifier.value = [];
+    LocalStorageService().delete('leave');
   }
 }

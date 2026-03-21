@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'data_utils.dart';
+import 'local_storage_service.dart';
 
 /// Manages hostel entry/exit data
 class HostelManager {
@@ -81,6 +82,7 @@ class HostelManager {
         '[HOSTEL MANAGER DEBUG] About to set notifier.value for existing row',
       );
       notifier.value = List<Map<String, dynamic>>.from(_hostelRows);
+      _save();
       debugPrint(
         '[HOSTEL MANAGER DEBUG] ✓ Notifier.value set to: ${notifier.value}',
       );
@@ -108,6 +110,7 @@ class HostelManager {
     _log('[HOSTEL MANAGER] Setting notifier with new data...');
     debugPrint('[HOSTEL MANAGER DEBUG] About to set notifier.value');
     notifier.value = List<Map<String, dynamic>>.from(_hostelRows);
+    _save();
     debugPrint(
       '[HOSTEL MANAGER DEBUG] ✓ Notifier.value set to: ${notifier.value}',
     );
@@ -122,8 +125,25 @@ class HostelManager {
     logCallback?.call(message);
   }
 
+  /// Save current rows to local storage
+  void _save() {
+    LocalStorageService().save('hostel', _hostelRows);
+  }
+
+  /// Load previously saved rows from local storage (daily reset applied)
+  Future<void> loadFromStorage() async {
+    final saved = await LocalStorageService().load('hostel');
+    if (saved.isNotEmpty) {
+      _hostelRows.clear();
+      _hostelRows.addAll(saved);
+      notifier.value = List<Map<String, dynamic>>.from(_hostelRows);
+      _log('[HOSTEL MANAGER] Loaded ${saved.length} rows from storage');
+    }
+  }
+
   void clear() {
     _hostelRows.clear();
     notifier.value = [];
+    LocalStorageService().delete('hostel');
   }
 }

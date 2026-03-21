@@ -224,7 +224,7 @@ class FirebaseService {
       'comingFrom': data['comingFrom']?.toString() ?? '',
       'hostel': data['hostel']?.toString() ?? '',
       'roomNumber': data['roomNumber']?.toString() ?? '',
-      'createdAt': data['createdAt'] ?? '',
+      'createdAt': data['createdAt']?.toString() ?? '',
       'scanCount': data['scanCount'] ?? 0,
       'location': location,
       'security': null,

@@ -60,6 +60,8 @@ class _HomeScreenState extends State<HomeScreen> {
       leaveManager: _leaveManager,
     );
     _qrAuthenticator.logCallback = _log;
+    // Load persisted data from local storage (auto-clears if from previous day)
+    _loadSavedData();
     Future.microtask(_startServer);
     _startAdbWatcher(); // simple watcher: wait-for-device then run reverse
   }
@@ -71,6 +73,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _portController.dispose();
     _stopAdbWatcher();
     super.dispose();
+  }
+
+  /// Load persisted data from all managers
+  Future<void> _loadSavedData() async {
+    _log('[STARTUP] Loading saved data from local storage...');
+    await _dayScholarManager.loadFromStorage();
+    await _hostelManager.loadFromStorage();
+    await _leaveManager.loadFromStorage();
+    _log('[STARTUP] ✓ Local storage loaded (day_scholar: ${_dayScholarManager.rows.length}, hostel: ${_hostelManager.rows.length}, leave: ${_leaveManager.rows.length})');
   }
 
   void _log(String s) {

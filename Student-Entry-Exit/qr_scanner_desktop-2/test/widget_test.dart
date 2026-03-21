@@ -5,7 +5,7 @@ import 'package:qr_scanner_desktop/screens/console_screen.dart';
 
 void main() {
   testWidgets('HomeScreen has a menu icon that opens the console', (
-    tester,
+    WidgetTester tester,
   ) async {
     await tester.pumpWidget(const MaterialApp(home: HomeScreen()));
 

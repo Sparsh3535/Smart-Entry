@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'data_utils.dart';
+import 'local_storage_service.dart';
 
 /// Manages day scholar attendance data
 class DayScholarManager {
@@ -63,6 +64,7 @@ class DayScholarManager {
       }
       _log('[DAY SCHOLAR MANAGER] Updates done, setting notifier...');
       notifier.value = List<Map<String, dynamic>>.from(_dayRows);
+      _save();
       _log(
         '[DAY SCHOLAR MANAGER] ✓ Notifier updated with ${notifier.value.length} rows',
       );
@@ -85,6 +87,7 @@ class DayScholarManager {
     );
     _log('[DAY SCHOLAR MANAGER] Setting notifier with new data...');
     notifier.value = List<Map<String, dynamic>>.from(_dayRows);
+    _save();
     _log(
       '[DAY SCHOLAR MANAGER] ✓ Notifier updated with ${notifier.value.length} rows',
     );
@@ -96,8 +99,25 @@ class DayScholarManager {
     logCallback?.call(message);
   }
 
+  /// Save current rows to local storage
+  void _save() {
+    LocalStorageService().save('day_scholar', _dayRows);
+  }
+
+  /// Load previously saved rows from local storage (daily reset applied)
+  Future<void> loadFromStorage() async {
+    final saved = await LocalStorageService().load('day_scholar');
+    if (saved.isNotEmpty) {
+      _dayRows.clear();
+      _dayRows.addAll(saved);
+      notifier.value = List<Map<String, dynamic>>.from(_dayRows);
+      _log('[DAY SCHOLAR MANAGER] Loaded ${saved.length} rows from storage');
+    }
+  }
+
   void clear() {
     _dayRows.clear();
     notifier.value = [];
+    LocalStorageService().delete('day_scholar');
   }
 }
