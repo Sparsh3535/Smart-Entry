@@ -53,6 +53,16 @@ class _HomeScreenState extends State<HomeScreen> {
     _dayScholarManager.logCallback = _log;
     _hostelManager.logCallback = _log;
     _leaveManager.logCallback = _log;
+
+    // When all time fields are filled, delete the Firebase document (keep screen entry)
+    _dayScholarManager.onEntryComplete = (docId) {
+      _log('[AUTO-DELETE] Day Scholar entry complete — deleting Firebase doc: $docId');
+      _firebaseService.deleteByDocumentId(docId);
+    };
+    _hostelManager.onEntryComplete = (docId) {
+      _log('[AUTO-DELETE] Hostel entry complete — deleting Firebase doc: $docId');
+      _firebaseService.deleteByDocumentId(docId);
+    };
     // Initialize QR authenticator
     _qrAuthenticator = QRAuthenticator(
       dayScholarManager: _dayScholarManager,
@@ -291,6 +301,8 @@ class _HomeScreenState extends State<HomeScreen> {
         _log('');
         _log('[ROUTING] Passing data directly to QRAuthenticator for processing...');
 
+        studentData['_docId'] = docId;
+        _log('[DOCID] Set _docId=$docId on studentData');
         _qrAuthenticator.processMap(studentData);
 
         _log('✓ Processing complete');

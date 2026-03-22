@@ -11,6 +11,10 @@ class DayScholarManager {
 
   Function(String)? logCallback;
 
+  /// Called when an entry is complete (both intime and outtime filled)
+  /// with the _docId so Firebase document can be deleted
+  Function(String docId)? onEntryComplete;
+
   List<Map<String, dynamic>> get rows => _dayRows;
 
   /// Insert or update day-scholar rows:
@@ -37,6 +41,11 @@ class DayScholarManager {
       final prevOut = (r['outtime'] as String?) ?? '';
       final now = shortDateTime(DateTime.now());
 
+      // Update _docId from incoming data (may be missing in cached rows)
+      if (fields['_docId'] != null) {
+        r['_docId'] = fields['_docId'];
+      }
+
       if (prevIn.trim().isEmpty) {
         // first event -> set intime
         r['intime'] = now;
@@ -51,6 +60,11 @@ class DayScholarManager {
         logCallback?.call(
           'DayScholar: set outtime to $now for id=${id ?? phone ?? name}',
         );
+        // Both filled -> trigger Firebase delete
+        final docId = r['_docId']?.toString();
+        if (docId != null && docId.isNotEmpty) {
+          onEntryComplete?.call(docId);
+        }
       } else {
         // both intime+outtime present -> start a new session with new intime
         final newRow = Map<String, dynamic>.from(r);

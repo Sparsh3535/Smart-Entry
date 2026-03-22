@@ -11,6 +11,10 @@ class HostelManager {
 
   Function(String)? logCallback;
 
+  /// Called when an entry is complete (both outtime and intime filled)
+  /// with the _docId so Firebase document can be deleted
+  Function(String docId)? onEntryComplete;
+
   List<Map<String, dynamic>> get rows => _hostelRows;
 
   HostelManager() {
@@ -43,6 +47,11 @@ class HostelManager {
       final prevOut = r['outtime'] as String?;
       final now = shortDateTime(DateTime.now());
 
+      // Update _docId from incoming data (may be missing in cached rows)
+      if (fields['_docId'] != null) {
+        r['_docId'] = fields['_docId'];
+      }
+
       if (prevOut == null || prevOut.toString().trim().isEmpty) {
         // first relevant scan -> set outtime; update location if provided
         r['outtime'] = now;
@@ -65,6 +74,11 @@ class HostelManager {
         logCallback?.call(
           'Hostel: set intime to $now for id=${id ?? phone ?? name}',
         );
+        // Both filled -> trigger Firebase delete
+        final docId = r['_docId']?.toString();
+        if (docId != null && docId.isNotEmpty) {
+          onEntryComplete?.call(docId);
+        }
       } else {
         // both intime + outtime present -> start a new session with OUT filled first
         final newRow = Map<String, dynamic>.from(r);

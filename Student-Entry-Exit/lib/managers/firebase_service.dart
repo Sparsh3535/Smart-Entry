@@ -14,6 +14,30 @@ class FirebaseService {
     return _instance;
   }
 
+  /// Delete a document by its ID from both collections
+  Future<void> deleteByDocumentId(String docId) async {
+    try {
+      print('[Firebase Service] Deleting document: $docId');
+      // Try gate_passes
+      final gpDoc = await _firestore.collection('gate_passes').doc(docId).get();
+      if (gpDoc.exists) {
+        await _firestore.collection('gate_passes').doc(docId).delete();
+        print('[Firebase Service] ✓ Deleted from gate_passes: $docId');
+        return;
+      }
+      // Try leave_requests
+      final lrDoc = await _firestore.collection('leave_requests').doc(docId).get();
+      if (lrDoc.exists) {
+        await _firestore.collection('leave_requests').doc(docId).delete();
+        print('[Firebase Service] ✓ Deleted from leave_requests: $docId');
+        return;
+      }
+      print('[Firebase Service] ⚠ Document not found in any collection: $docId');
+    } catch (e) {
+      print('[Firebase Service] Error deleting $docId: $e');
+    }
+  }
+
   /// Fetch student data by Firestore document ID (the key received on port 9000)
   /// Checks both gate_passes and leave_requests collections
   /// Retries if critical fields are empty after normalization
