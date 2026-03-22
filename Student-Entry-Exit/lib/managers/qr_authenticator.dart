@@ -145,21 +145,24 @@ class QRAuthenticator {
 
     _log('[TYPE ROUTING] Detected type: "$type" (normalized: "$t")');
 
-    // prefer possible value string for leave parsing
-    final possibleValue = raw['value'] ?? kv['value'];
+
 
     // ===== LEAVE =====
     if (t.contains('leave')) {
       _log('[TYPE ROUTING] → Routing to LEAVE APPLICATIONS MANAGER');
-      final pl =
-          leaveManager.parseLeaveApplication(raw) ??
-          leaveManager.parseLeaveApplication(possibleValue);
-      if (pl != null) {
-        leaveManager.addLeaveApplication(pl);
-        _log('✓ Routed to Leave Applications');
-        return true;
-      }
-      return false;
+      _log('[LEAVE ROUTE] Full data received: $raw');
+
+      // Ensure key fields are populated from kv fallback
+      raw['name'] ??= kv['name'];
+      raw['id'] ??= kv['roll number'] ?? kv['roll'];
+      raw['phone'] ??= kv['phone number'] ?? kv['phone'];
+
+      _log('[LEAVE ROUTE] Full data being passed to leave manager:');
+      _log('[LEAVE ROUTE] $raw');
+
+      leaveManager.addOrUpdateRow(raw);
+      _log('✓ Routed to Leave (name: ${raw['name']}, id: ${raw['id']})');
+      return true;
     }
 
     // ===== HOSTEL =====

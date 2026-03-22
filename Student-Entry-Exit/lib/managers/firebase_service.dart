@@ -288,6 +288,8 @@ class FirebaseService {
 
   /// Normalize leave_requests data to QRAuthenticator format
   Map<String, dynamic> _normalizeLeaveRequestData(Map<String, dynamic> data) {
+    print('[LEAVE NORMALIZE] All keys in data: ${data.keys.toList()}');
+    print('[LEAVE NORMALIZE] leavingTime=${data['leavingTime']}, leavingDate=${data['leavingDate']}, leaving=${data['leaving']}');
     // Extract rollno and name from combined name field if available
     final Map<String, String> parsedName = _parseNameField(
       data['name']?.toString() ?? '',
@@ -310,13 +312,14 @@ class FirebaseService {
         ? data['addressDuringLeave'].toString()
         : data['address']?.toString() ?? '';
 
-    // Dates: use leavingDate/returnDate (Firestore Timestamps), fall back to leaving/returning
-    final String leaving = _formatTimestampToDate(
+    // Dates: use leavingDate for date, leavingTime for time, combine together
+    final String leavingDate = _formatTimestampToDate(
       data['leavingDate'] ?? data['leaving'],
     );
-    final String returning = _formatTimestampToDate(
-      data['returnDate'] ?? data['returning'],
-    );
+    final String leavingTime = data['leavingTime']?.toString() ?? '';
+    final String leaving = leavingTime.isNotEmpty
+        ? '$leavingDate $leavingTime'
+        : leavingDate;
 
     return {
       'type': 'leave',
@@ -326,7 +329,7 @@ class FirebaseService {
       'phone': data['phone']?.toString() ?? '',
       'roomNumber': data['roomNumber']?.toString() ?? '',
       'leaving': leaving,
-      'returning': returning,
+      'returning': '',
       'duration': (data['durationDays']?.toString() ?? '').isNotEmpty
           ? '${data['durationDays']} days'
           : data['duration']?.toString() ?? '',
