@@ -15,7 +15,7 @@ class LocalStorageService {
     return Directory('${exeDir.path}${Platform.pathSeparator}data');
   }
 
-  /// Get today's date as yyyy-MM-dd string
+  /// Get today's date as yyyy-MM-dd string (day resets at midnight).
   String get _today {
     final now = DateTime.now();
     String two(int n) => n.toString().padLeft(2, '0');
@@ -87,6 +87,31 @@ class LocalStorageService {
       return rows;
     } catch (e) {
       debugPrint('[LocalStorage] Error loading "$key": $e');
+      return [];
+    }
+  }
+
+  /// Load rows WITHOUT date-based clearing (returns all saved rows regardless of date)
+  /// Used by leave applications which have custom clearing logic
+  Future<List<Map<String, dynamic>>> loadRaw(String key) async {
+    try {
+      final file = File('${_dataDir.path}${Platform.pathSeparator}$key.json');
+      if (!await file.exists()) {
+        debugPrint('[LocalStorage] No saved data for "$key"');
+        return [];
+      }
+
+      final content = await file.readAsString();
+      final payload = jsonDecode(content) as Map<String, dynamic>;
+      final rawRows = payload['rows'] as List<dynamic>;
+      final rows = rawRows
+          .map((r) => Map<String, dynamic>.from(r as Map))
+          .toList();
+
+      debugPrint('[LocalStorage] Loaded ${rows.length} raw rows for "$key" (no date filter)');
+      return rows;
+    } catch (e) {
+      debugPrint('[LocalStorage] Error loading raw "$key": $e');
       return [];
     }
   }

@@ -14,7 +14,7 @@ class FirebaseService {
     return _instance;
   }
 
-  /// Delete a document by its ID from both collections
+  /// Delete a document by its Firestore document ID from both collections.
   Future<void> deleteByDocumentId(String docId) async {
     try {
       print('[Firebase Service] Deleting document: $docId');

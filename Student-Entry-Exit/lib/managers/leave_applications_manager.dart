@@ -11,6 +11,10 @@ class LeaveApplicationsManager {
 
   Function(String)? logCallback;
 
+  /// Called when an entry is complete (both leaving and returning filled)
+  /// with the _docId so Firebase document can be deleted
+  Function(String docId)? onEntryComplete;
+
   List<Map<String, dynamic>> get rows => _leaveApps;
 
   /// Try to parse leave application from String or Map. Returns normalized map or null.
@@ -113,6 +117,14 @@ class LeaveApplicationsManager {
       final prevReturning = (r['returning'] as String?) ?? '';
       final now = shortDateTime(DateTime.now());
 
+      // Update _docId from incoming data (may be missing in cached rows)
+      if (fields['_docId'] != null) {
+        r['_docId'] = fields['_docId'];
+        debugPrint('[LEAVE MANAGER] Updated _docId to: ${fields['_docId']}');
+      } else {
+        debugPrint('[LEAVE MANAGER] WARNING: incoming fields has no _docId!');
+      }
+
       // Update leaving from incoming data if it has a newer/more complete value
       final incomingLeaving = fields['leaving']?.toString() ?? '';
       if (incomingLeaving.isNotEmpty) {
@@ -126,6 +138,15 @@ class LeaveApplicationsManager {
         logCallback?.call(
           'Leave: set returning to $now for id=${id ?? phone ?? name}',
         );
+        // Both filled → trigger Firebase delete
+        final docId = r['_docId']?.toString();
+        debugPrint('[LEAVE MANAGER] Entry complete. _docId=$docId, onEntryComplete=${onEntryComplete != null ? "SET" : "NULL"}');
+        if (docId != null && docId.isNotEmpty) {
+          onEntryComplete?.call(docId);
+          debugPrint('[LEAVE MANAGER] ✓ Called onEntryComplete with docId=$docId');
+        } else {
+          debugPrint('[LEAVE MANAGER] ✗ Cannot delete: _docId is null or empty');
+        }
       } else {
         // both filled → start new row
         final newRow = Map<String, dynamic>.from(r);
@@ -166,15 +187,46 @@ class LeaveApplicationsManager {
     LocalStorageService().save('leave', _leaveApps);
   }
 
-  /// Load previously saved rows from local storage (daily reset applied)
+  /// Load saved leave rows with selective midnight reset:
+  /// - Completed entries (all key fields filled) from previous days are removed
+  /// - Incomplete entries (e.g. returning is empty) persist until filled
   Future<void> loadFromStorage() async {
-    final saved = await LocalStorageService().load('leave');
-    if (saved.isNotEmpty) {
-      _leaveApps.clear();
-      _leaveApps.addAll(saved);
-      notifier.value = List<Map<String, dynamic>>.from(_leaveApps);
-      _log('[LEAVE MANAGER] Loaded ${saved.length} rows from storage');
+    final saved = await LocalStorageService().loadRaw('leave');
+    if (saved.isEmpty) {
+      _log('[LEAVE MANAGER] No saved leave data');
+      return;
     }
+
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    final filtered = saved.where((row) {
+      final leaving = (row['leaving']?.toString() ?? '').trim();
+      final returning = (row['returning']?.toString() ?? '').trim();
+      final isComplete = leaving.isNotEmpty && returning.isNotEmpty;
+
+      if (!isComplete) {
+        // Incomplete entry — keep it regardless of date
+        return true;
+      }
+
+      // Completed entry — only keep if from today
+      final receivedAt = row['receivedAt']?.toString() ?? '';
+      if (receivedAt.length >= 10) {
+        final dateStr = receivedAt.substring(0, 10); // "yyyy-MM-dd"
+        if (dateStr != todayStr) {
+          _log('[LEAVE MANAGER] Removing completed entry from $dateStr: ${row['name']}');
+          return false; // remove
+        }
+      }
+      return true; // keep
+    }).toList();
+
+    _leaveApps.clear();
+    _leaveApps.addAll(filtered);
+    notifier.value = List<Map<String, dynamic>>.from(_leaveApps);
+    _save(); // re-save the filtered list
+    _log('[LEAVE MANAGER] Loaded ${filtered.length} rows (removed ${saved.length - filtered.length} completed entries from previous days)');
   }
 
   void clear() {

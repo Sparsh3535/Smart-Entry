@@ -63,6 +63,10 @@ class _HomeScreenState extends State<HomeScreen> {
       _log('[AUTO-DELETE] Hostel entry complete — deleting Firebase doc: $docId');
       _firebaseService.deleteByDocumentId(docId);
     };
+    _leaveManager.onEntryComplete = (docId) {
+      _log('[AUTO-DELETE] Leave entry complete — deleting Firebase doc: $docId');
+      _firebaseService.deleteByDocumentId(docId);
+    };
     // Initialize QR authenticator
     _qrAuthenticator = QRAuthenticator(
       dayScholarManager: _dayScholarManager,
