@@ -203,5 +203,6 @@ class CsvService {
     {'key': 'duration', 'header': 'Duration'},
     {'key': 'address', 'header': 'Address'},
     {'key': 'receivedAt', 'header': 'Received'},
+    {'key': 'security', 'header': 'Security'},
   ];
 }

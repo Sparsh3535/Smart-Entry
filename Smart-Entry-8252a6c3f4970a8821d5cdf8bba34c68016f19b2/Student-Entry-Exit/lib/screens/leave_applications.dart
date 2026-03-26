@@ -118,7 +118,7 @@ class _LeaveApplicationsScreenState extends State<LeaveApplicationsScreen> {
                           builder: (ctx) {
                             final screenWidth = MediaQuery.of(ctx).size.width - 48;
                             final minW = screenWidth;
-                            final colCount = 9;
+                            final colCount = 10;
                             final columnSpacing = math.max(
                               12.0,
                               (minW / math.max(1, colCount).toDouble()) * 0.7,
@@ -140,6 +140,7 @@ class _LeaveApplicationsScreenState extends State<LeaveApplicationsScreen> {
                                     DataColumn(label: Text('Duration', style: TextStyle(fontWeight: FontWeight.bold))),
                                     DataColumn(label: Text('Address', style: TextStyle(fontWeight: FontWeight.bold))),
                                     DataColumn(label: Text('Received', style: TextStyle(fontWeight: FontWeight.bold))),
+                                    DataColumn(label: Text('Security', style: TextStyle(fontWeight: FontWeight.bold))),
                                   ],
                                   rows: leaves.map((a) {
                                     final name = _cell(a, ['name', 'Name', 'full name', 'fullname']);
@@ -151,6 +152,7 @@ class _LeaveApplicationsScreenState extends State<LeaveApplicationsScreen> {
                                     final duration = _cell(a, ['duration', 'Duration']);
                                     final address = _cell(a, ['address', 'Address', 'addressDuringLeave', 'location', 'Location']);
                                     final received = _cell(a, ['receivedAt', 'received_at', 'received']);
+                                    final security = _cell(a, ['security', 'Security']);
 
                                     Widget leavingWidget() {
                                       if (leaving.isEmpty) {
@@ -180,6 +182,19 @@ class _LeaveApplicationsScreenState extends State<LeaveApplicationsScreen> {
                                       );
                                     }
 
+                                    String securityLabel() {
+                                      return security.isNotEmpty ? security : '';
+                                    }
+
+                                    Color securityColor() {
+                                      final s = security.toLowerCase();
+                                      if (s.contains('checked')) return Colors.green.shade600;
+                                      if (s.contains('late')) return Colors.amber.shade700;
+                                      if (s.contains('unverified') || s.contains('un')) return Colors.red.shade400;
+                                      return Colors.grey.shade400;
+                                    }
+
+                                    final secLabel = securityLabel();
                                     const cellStyle = TextStyle(fontSize: 14);
                                     return DataRow(
                                       cells: [
@@ -192,6 +207,14 @@ class _LeaveApplicationsScreenState extends State<LeaveApplicationsScreen> {
                                         DataCell(durationWidget()),
                                         DataCell(SelectableText(address, style: cellStyle)),
                                         DataCell(SelectableText(received, style: cellStyle)),
+                                        DataCell(
+                                          secLabel.isEmpty
+                                              ? const SizedBox.shrink()
+                                              : Chip(
+                                                  label: Text(secLabel, style: const TextStyle(color: Colors.white, fontSize: 13)),
+                                                  backgroundColor: securityColor(),
+                                                ),
+                                        ),
                                       ],
                                     );
                                   }).toList(),

@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'data_utils.dart';
 import 'csv_service.dart';
 import 'local_storage_service.dart';
+import 'security_name_service.dart';
 
 /// Manages leave application data
 class LeaveApplicationsManager {
@@ -50,6 +51,7 @@ class LeaveApplicationsManager {
           'returning': low['returning'] ?? '',
           'duration': low['duration'] ?? '',
           'address': low['address'] ?? low['addressduringleave'] ?? '',
+          'security': low['security'] ?? '',
           'receivedAt': shortDateTime(DateTime.now()),
         };
       }
@@ -88,6 +90,7 @@ class LeaveApplicationsManager {
         'returning': map['returning'] ?? '',
         'duration': map['duration'] ?? '',
         'address': map['address'] ?? '',
+        'security': map['security'] ?? '',
         'receivedAt': shortDateTime(DateTime.now()),
       };
     }
@@ -153,6 +156,7 @@ class LeaveApplicationsManager {
         final newRow = Map<String, dynamic>.from(r);
         newRow['returning'] = null;
         newRow['receivedAt'] = now;
+        newRow['security'] = SecurityNameService().name;
         _leaveApps.add(newRow);
         logCallback?.call(
           'Leave: started new session for id=${id ?? phone ?? name}',
@@ -169,6 +173,7 @@ class LeaveApplicationsManager {
     final normalized = Map<String, dynamic>.from(fields);
     normalized['returning'] = null;
     normalized['receivedAt'] = shortDateTime(DateTime.now());
+    normalized['security'] = SecurityNameService().name;
     _log('[LEAVE MANAGER] Creating new row: $normalized');
     _leaveApps.add(normalized);
     _log('[LEAVE MANAGER] ✓ Added new entry. Total rows now: ${_leaveApps.length}');

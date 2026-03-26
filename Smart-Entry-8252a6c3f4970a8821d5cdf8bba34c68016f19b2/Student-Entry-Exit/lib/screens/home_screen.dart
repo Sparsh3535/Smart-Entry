@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../managers/day_scholar_manager.dart';
@@ -11,6 +10,7 @@ import '../managers/qr_authenticator.dart';
 import '../managers/firebase_service.dart';
 import '../managers/csv_service.dart';
 import '../managers/local_storage_service.dart';
+import '../managers/security_name_service.dart';
 import 'day_scholar.dart';
 import 'leave_applications.dart';
 import 'hostel.dart';
@@ -38,8 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _portController = TextEditingController(
     text: '9000',
   );
-  // Optional in-memory override for the current security person's name.
-  String? _securityOverride;
 
   // Simple adb watcher (wait-for-device -> run adb reverse)
   Process? _adbWatcherProcess;
@@ -58,15 +56,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // When all time fields are filled, delete the Firebase document (keep screen entry)
     _dayScholarManager.onEntryComplete = (docId) {
-      _log('[AUTO-DELETE] Day Scholar entry complete — deleting Firebase doc: $docId');
+      _log(
+        '[AUTO-DELETE] Day Scholar entry complete — deleting Firebase doc: $docId',
+      );
       _firebaseService.deleteByDocumentId(docId);
     };
     _hostelManager.onEntryComplete = (docId) {
-      _log('[AUTO-DELETE] Hostel entry complete — deleting Firebase doc: $docId');
+      _log(
+        '[AUTO-DELETE] Hostel entry complete — deleting Firebase doc: $docId',
+      );
       _firebaseService.deleteByDocumentId(docId);
     };
     _leaveManager.onEntryComplete = (docId) {
-      _log('[AUTO-DELETE] Leave entry complete — deleting Firebase doc: $docId');
+      _log(
+        '[AUTO-DELETE] Leave entry complete — deleting Firebase doc: $docId',
+      );
       _firebaseService.deleteByDocumentId(docId);
     };
     // Initialize QR authenticator
@@ -85,6 +89,10 @@ class _HomeScreenState extends State<HomeScreen> {
 
   /// Startup sequence: load CSV path → prompt if needed → then load data
   Future<void> _startupSequence() async {
+    // Step 0: Load saved security guard name
+    await SecurityNameService().load();
+    _log('[SECURITY] Guard name: ${SecurityNameService().name.isEmpty ? '(not set)' : SecurityNameService().name}');
+
     // Step 1: Load saved CSV path
     await CsvService().loadSavedPath();
 
@@ -93,9 +101,11 @@ class _HomeScreenState extends State<HomeScreen> {
       // Use a Completer to wait until the user sets the path (or skips)
       final completer = Completer<void>();
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _showCsvPathDialog(onDone: () {
-          if (!completer.isCompleted) completer.complete();
-        });
+        _showCsvPathDialog(
+          onDone: () {
+            if (!completer.isCompleted) completer.complete();
+          },
+        );
       });
       await completer.future;
     } else {
@@ -125,7 +135,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final staleDs = await storage.getStaleDocIds('day_scholar');
     final staleHostel = await storage.getStaleDocIds('hostel');
     if (staleDs.isNotEmpty || staleHostel.isNotEmpty) {
-      _log('[MIDNIGHT RESET] Deleting ${staleDs.length + staleHostel.length} stale entries from Firebase...');
+      _log(
+        '[MIDNIGHT RESET] Deleting ${staleDs.length + staleHostel.length} stale entries from Firebase...',
+      );
       for (final docId in [...staleDs, ...staleHostel]) {
         await _firebaseService.deleteByDocumentId(docId);
       }
@@ -136,7 +148,9 @@ class _HomeScreenState extends State<HomeScreen> {
     await _dayScholarManager.loadFromStorage();
     await _hostelManager.loadFromStorage();
     await _leaveManager.loadFromStorage();
-    _log('[STARTUP] ✓ Local storage loaded (day_scholar: ${_dayScholarManager.rows.length}, hostel: ${_hostelManager.rows.length}, leave: ${_leaveManager.rows.length})');
+    _log(
+      '[STARTUP] ✓ Local storage loaded (day_scholar: ${_dayScholarManager.rows.length}, hostel: ${_hostelManager.rows.length}, leave: ${_leaveManager.rows.length})',
+    );
   }
 
   /// Show dialog to set CSV save path
@@ -149,7 +163,9 @@ class _HomeScreenState extends State<HomeScreen> {
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
           title: Row(
             children: const [
               Icon(Icons.folder_open, color: Colors.deepPurple, size: 28),
@@ -197,23 +213,32 @@ class _HomeScreenState extends State<HomeScreen> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.deepPurple,
                 foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               onPressed: () async {
                 final path = pathController.text.trim();
                 if (path.isEmpty) {
-                  setDialogState(() => errorText = 'Please enter a folder path');
+                  setDialogState(
+                    () => errorText = 'Please enter a folder path',
+                  );
                   return;
                 }
 
                 final success = await CsvService().setBasePath(path);
                 if (success) {
                   _log('[CSV] Save path set: $path');
-                  _log('[CSV] Subfolders created: day_scholar, hostel, leave_application');
+                  _log(
+                    '[CSV] Subfolders created: day_scholar, hostel, leave_application',
+                  );
                   if (mounted) Navigator.of(ctx).pop();
                   onDone?.call();
                 } else {
-                  setDialogState(() => errorText = 'Path does not exist. Please enter a valid folder path.');
+                  setDialogState(
+                    () => errorText =
+                        'Path does not exist. Please enter a valid folder path.',
+                  );
                 }
               },
               child: const Text('Save'),
@@ -429,7 +454,9 @@ class _HomeScreenState extends State<HomeScreen> {
         // Pass the fetched data directly to QRAuthenticator as a Map
         // (no JSON encode/decode round-trip — avoids issues with non-serializable values)
         _log('');
-        _log('[ROUTING] Passing data directly to QRAuthenticator for processing...');
+        _log(
+          '[ROUTING] Passing data directly to QRAuthenticator for processing...',
+        );
 
         studentData['_docId'] = docId;
         _log('[DOCID] Set _docId=$docId on studentData');
@@ -490,8 +517,8 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('Security login'),
               onTap: () {
                 Navigator.of(context).pop();
-                // show editable dialog to set security name (in-memory)
-                final ctl = TextEditingController(text: _currentSecurityName());
+                // show editable dialog to set security name (persisted to disk)
+                final ctl = TextEditingController(text: SecurityNameService().name);
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
@@ -508,11 +535,11 @@ class _HomeScreenState extends State<HomeScreen> {
                         child: const Text('Cancel'),
                       ),
                       ElevatedButton(
-                        onPressed: () {
-                          setState(() {
-                            _securityOverride = ctl.text.trim();
-                          });
-                          Navigator.of(ctx).pop();
+                        onPressed: () async {
+                          final newName = ctl.text.trim();
+                          await SecurityNameService().save(newName);
+                          _log('[SECURITY] Guard name changed to: $newName');
+                          if (mounted) Navigator.of(ctx).pop();
                         },
                         child: const Text('Save'),
                       ),
@@ -530,7 +557,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 showDialog(
                   context: context,
                   builder: (ctx) => AlertDialog(
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
                     title: Row(
                       children: const [
                         Icon(Icons.settings, size: 24),
@@ -546,7 +575,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           const Text(
                             'CSV Offline Copies Location',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 15,
+                            ),
                           ),
                           const SizedBox(height: 8),
                           Container(
@@ -563,15 +595,23 @@ class _HomeScreenState extends State<HomeScreen> {
                                 Row(
                                   children: [
                                     Icon(
-                                      currentPath != null ? Icons.check_circle : Icons.warning_amber,
-                                      color: currentPath != null ? Colors.green : Colors.orange,
+                                      currentPath != null
+                                          ? Icons.check_circle
+                                          : Icons.warning_amber,
+                                      color: currentPath != null
+                                          ? Colors.green
+                                          : Colors.orange,
                                       size: 18,
                                     ),
                                     const SizedBox(width: 8),
                                     Text(
-                                      currentPath != null ? 'Path configured' : 'Not configured',
+                                      currentPath != null
+                                          ? 'Path configured'
+                                          : 'Not configured',
                                       style: TextStyle(
-                                        color: currentPath != null ? Colors.green : Colors.orange,
+                                        color: currentPath != null
+                                            ? Colors.green
+                                            : Colors.orange,
                                         fontWeight: FontWeight.w600,
                                         fontSize: 13,
                                       ),
@@ -582,12 +622,18 @@ class _HomeScreenState extends State<HomeScreen> {
                                   const SizedBox(height: 8),
                                   SelectableText(
                                     currentPath,
-                                    style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                                    style: const TextStyle(
+                                      fontSize: 13,
+                                      fontFamily: 'monospace',
+                                    ),
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
                                     'Subfolders: day_scholar, hostel, leave_application',
-                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                    style: TextStyle(
+                                      color: Colors.grey.shade600,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ],
                               ],
@@ -603,11 +649,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       ElevatedButton.icon(
                         icon: const Icon(Icons.edit, size: 16),
-                        label: Text(currentPath != null ? 'Change Path' : 'Set Path'),
+                        label: Text(
+                          currentPath != null ? 'Change Path' : 'Set Path',
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.deepPurple,
                           foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                         onPressed: () {
                           Navigator.of(ctx).pop();
@@ -1019,7 +1069,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        _currentSecurityName(),
+                        SecurityNameService().name.isEmpty ? '(not set)' : SecurityNameService().name,
                         style: const TextStyle(
                           fontSize: 14,
                           color: Colors.black87,
@@ -1036,29 +1086,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Determine the current security person's name from recent rows.
-  // Scans hostel rows then dayRows for the most recent non-empty 'security' value.
-  String _currentSecurityName() {
-    // If user set an explicit override via the Security login, prefer it.
-    if (_securityOverride != null && _securityOverride!.trim().isNotEmpty) {
-      return _securityOverride!.trim();
-    }
-    for (var i = _hostelManager.rows.length - 1; i >= 0; i--) {
-      final s = _hostelManager.rows[i]['security'];
-      if (s != null) {
-        final ss = s.toString().trim();
-        if (ss.isNotEmpty) return ss;
-      }
-    }
-    for (var i = _dayScholarManager.rows.length - 1; i >= 0; i--) {
-      final s = _dayScholarManager.rows[i]['security'];
-      if (s != null) {
-        final ss = s.toString().trim();
-        if (ss.isNotEmpty) return ss;
-      }
-    }
-    return 'Unknown';
-  }
 
   // Simple watcher that uses `adb wait-for-device` and runs `adb reverse` when a device appears.
   // This is lightweight and runs in the background while the app is open.

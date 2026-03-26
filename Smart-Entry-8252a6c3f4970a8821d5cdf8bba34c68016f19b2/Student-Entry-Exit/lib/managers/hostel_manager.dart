@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'data_utils.dart';
 import 'local_storage_service.dart';
+import 'security_name_service.dart';
 
 /// Manages hostel entry/exit data
 class HostelManager {
@@ -85,7 +86,7 @@ class HostelManager {
         newRow['location'] = fields['location'] ?? r['location'];
         newRow['intime'] = null;
         newRow['outtime'] = now;
-        newRow['security'] = null;
+        newRow['security'] = SecurityNameService().name;
         _hostelRows.add(newRow);
         logCallback?.call(
           'Hostel: started new session (outtime=$now) for id=${id ?? phone ?? name}',
@@ -111,7 +112,7 @@ class HostelManager {
     final normalized = Map<String, dynamic>.from(fields);
     normalized['intime'] = null;
     normalized['outtime'] = shortDateTime(DateTime.now());
-    normalized['security'] = null;
+    normalized['security'] = SecurityNameService().name;
     _log('[HOSTEL MANAGER] Creating new row: $normalized');
     _hostelRows.add(normalized);
     debugPrint(

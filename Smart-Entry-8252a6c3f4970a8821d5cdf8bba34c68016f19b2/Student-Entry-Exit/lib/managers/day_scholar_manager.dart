@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'data_utils.dart';
 import 'local_storage_service.dart';
+import 'security_name_service.dart';
 
 /// Manages day scholar attendance data
 class DayScholarManager {
@@ -70,7 +71,7 @@ class DayScholarManager {
         final newRow = Map<String, dynamic>.from(r);
         newRow['intime'] = now;
         newRow['outtime'] = null;
-        newRow['security'] = null;
+        newRow['security'] = SecurityNameService().name;
         _dayRows.add(newRow);
         logCallback?.call(
           'DayScholar: started new session (intime=$now) for id=${id ?? phone ?? name}',
@@ -90,7 +91,7 @@ class DayScholarManager {
     final normalized = Map<String, dynamic>.from(fields);
     normalized['intime'] = shortDateTime(DateTime.now());
     normalized['outtime'] = null;
-    normalized['security'] = null;
+    normalized['security'] = SecurityNameService().name;
     _log('[DAY SCHOLAR MANAGER] Creating new row: $normalized');
     _dayRows.add(normalized);
     _log(
