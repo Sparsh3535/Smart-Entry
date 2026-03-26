@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'data_utils.dart';
+import 'csv_service.dart';
 import 'local_storage_service.dart';
 
 /// Manages leave application data
@@ -200,27 +201,48 @@ class LeaveApplicationsManager {
     final now = DateTime.now();
     final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
 
+    // Separate completed old entries for CSV export
+    final toExport = <Map<String, dynamic>>[];
     final filtered = saved.where((row) {
       final leaving = (row['leaving']?.toString() ?? '').trim();
       final returning = (row['returning']?.toString() ?? '').trim();
       final isComplete = leaving.isNotEmpty && returning.isNotEmpty;
 
       if (!isComplete) {
-        // Incomplete entry — keep it regardless of date
+        // Incomplete — keep on screen
         return true;
       }
 
-      // Completed entry — only keep if from today
       final receivedAt = row['receivedAt']?.toString() ?? '';
       if (receivedAt.length >= 10) {
-        final dateStr = receivedAt.substring(0, 10); // "yyyy-MM-dd"
+        final dateStr = receivedAt.substring(0, 10);
         if (dateStr != todayStr) {
           _log('[LEAVE MANAGER] Removing completed entry from $dateStr: ${row['name']}');
-          return false; // remove
+          toExport.add(row);
+          return false;
         }
       }
-      return true; // keep
+      return true;
     }).toList();
+
+    // Export completed entries to CSV
+    if (toExport.isNotEmpty) {
+      final byDate = <String, List<Map<String, dynamic>>>{};
+      for (final row in toExport) {
+        final receivedAt = row['receivedAt']?.toString() ?? '';
+        final dateStr = receivedAt.length >= 10 ? receivedAt.substring(0, 10) : 'unknown';
+        byDate.putIfAbsent(dateStr, () => []).add(row);
+      }
+      for (final entry in byDate.entries) {
+        await CsvService().exportToCsv(
+          managerName: 'leave',
+          date: entry.key,
+          rows: entry.value,
+          columns: CsvService.leaveColumns,
+        );
+      }
+      _log('[LEAVE MANAGER] Exported ${toExport.length} completed entries to CSV');
+    }
 
     _leaveApps.clear();
     _leaveApps.addAll(filtered);

@@ -9,6 +9,8 @@ import '../managers/hostel_manager.dart';
 import '../managers/leave_applications_manager.dart';
 import '../managers/qr_authenticator.dart';
 import '../managers/firebase_service.dart';
+import '../managers/csv_service.dart';
+import '../managers/local_storage_service.dart';
 import 'day_scholar.dart';
 import 'leave_applications.dart';
 import 'hostel.dart';
@@ -75,9 +77,33 @@ class _HomeScreenState extends State<HomeScreen> {
     );
     _qrAuthenticator.logCallback = _log;
     // Load persisted data from local storage (auto-clears if from previous day)
-    _loadSavedData();
+    // But first ensure CSV path is configured so exports work
+    _startupSequence();
     Future.microtask(_startServer);
     _startAdbWatcher(); // simple watcher: wait-for-device then run reverse
+  }
+
+  /// Startup sequence: load CSV path → prompt if needed → then load data
+  Future<void> _startupSequence() async {
+    // Step 1: Load saved CSV path
+    await CsvService().loadSavedPath();
+
+    if (!CsvService().isPathConfigured) {
+      // Step 2: Wait for first frame, then show path dialog
+      // Use a Completer to wait until the user sets the path (or skips)
+      final completer = Completer<void>();
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _showCsvPathDialog(onDone: () {
+          if (!completer.isCompleted) completer.complete();
+        });
+      });
+      await completer.future;
+    } else {
+      _log('[CSV] Save path: ${CsvService().basePath}');
+    }
+
+    // Step 3: Now load saved data (CSV path is available for export)
+    await _loadSavedData();
   }
 
   @override
@@ -89,13 +115,113 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  /// Load persisted data from all managers
+  /// Load persisted data from all managers.
+  /// Before loading, delete all stale day_scholar and hostel entries from Firebase.
   Future<void> _loadSavedData() async {
     _log('[STARTUP] Loading saved data from local storage...');
+
+    // Delete ALL stale day_scholar and hostel entries from Firebase (midnight reset)
+    final storage = LocalStorageService();
+    final staleDs = await storage.getStaleDocIds('day_scholar');
+    final staleHostel = await storage.getStaleDocIds('hostel');
+    if (staleDs.isNotEmpty || staleHostel.isNotEmpty) {
+      _log('[MIDNIGHT RESET] Deleting ${staleDs.length + staleHostel.length} stale entries from Firebase...');
+      for (final docId in [...staleDs, ...staleHostel]) {
+        await _firebaseService.deleteByDocumentId(docId);
+      }
+      _log('[MIDNIGHT RESET] ✓ All stale Firebase entries deleted');
+    }
+
+    // Now load (which exports CSV and clears old data)
     await _dayScholarManager.loadFromStorage();
     await _hostelManager.loadFromStorage();
     await _leaveManager.loadFromStorage();
     _log('[STARTUP] ✓ Local storage loaded (day_scholar: ${_dayScholarManager.rows.length}, hostel: ${_hostelManager.rows.length}, leave: ${_leaveManager.rows.length})');
+  }
+
+  /// Show dialog to set CSV save path
+  void _showCsvPathDialog({VoidCallback? onDone}) {
+    final pathController = TextEditingController();
+    String? errorText;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: Row(
+            children: const [
+              Icon(Icons.folder_open, color: Colors.deepPurple, size: 28),
+              SizedBox(width: 12),
+              Text('Set CSV Save Path'),
+            ],
+          ),
+          content: SizedBox(
+            width: 500,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Enter the folder path where attendance CSV files will be saved.\n'
+                  'Subfolders (day_scholar, hostel, leave_application) will be created automatically.',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: pathController,
+                  decoration: InputDecoration(
+                    hintText: r'e.g. C:\Users\spars\Desktop\Attendance',
+                    prefixIcon: const Icon(Icons.folder),
+                    errorText: errorText,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey.shade100,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                onDone?.call();
+              },
+              child: const Text('Skip'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.deepPurple,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              onPressed: () async {
+                final path = pathController.text.trim();
+                if (path.isEmpty) {
+                  setDialogState(() => errorText = 'Please enter a folder path');
+                  return;
+                }
+
+                final success = await CsvService().setBasePath(path);
+                if (success) {
+                  _log('[CSV] Save path set: $path');
+                  _log('[CSV] Subfolders created: day_scholar, hostel, leave_application');
+                  if (mounted) Navigator.of(ctx).pop();
+                  onDone?.call();
+                } else {
+                  setDialogState(() => errorText = 'Path does not exist. Please enter a valid folder path.');
+                }
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   void _log(String s) {
@@ -400,6 +526,97 @@ class _HomeScreenState extends State<HomeScreen> {
               title: const Text('Settings'),
               onTap: () {
                 Navigator.of(context).pop();
+                final currentPath = CsvService().basePath;
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    title: Row(
+                      children: const [
+                        Icon(Icons.settings, size: 24),
+                        SizedBox(width: 10),
+                        Text('Settings'),
+                      ],
+                    ),
+                    content: SizedBox(
+                      width: 500,
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'CSV Offline Copies Location',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey.shade100,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.grey.shade300),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Icon(
+                                      currentPath != null ? Icons.check_circle : Icons.warning_amber,
+                                      color: currentPath != null ? Colors.green : Colors.orange,
+                                      size: 18,
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      currentPath != null ? 'Path configured' : 'Not configured',
+                                      style: TextStyle(
+                                        color: currentPath != null ? Colors.green : Colors.orange,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                if (currentPath != null) ...[
+                                  const SizedBox(height: 8),
+                                  SelectableText(
+                                    currentPath,
+                                    style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
+                                  ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    'Subfolders: day_scholar, hostel, leave_application',
+                                    style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.of(ctx).pop(),
+                        child: const Text('Close'),
+                      ),
+                      ElevatedButton.icon(
+                        icon: const Icon(Icons.edit, size: 16),
+                        label: Text(currentPath != null ? 'Change Path' : 'Set Path'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurple,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        ),
+                        onPressed: () {
+                          Navigator.of(ctx).pop();
+                          _showCsvPathDialog();
+                        },
+                      ),
+                    ],
+                  ),
+                );
               },
             ),
             const Divider(),

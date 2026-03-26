@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'csv_service.dart';
 
 /// Singleton service for persisting manager data to local JSON files.
 /// Data is saved with today's date and auto-cleared on the next day (midnight reset).
@@ -73,7 +74,39 @@ class LocalStorageService {
       final savedDate = payload['date'] as String?;
 
       if (savedDate != _today) {
-        debugPrint('[LocalStorage] Data for "$key" is from $savedDate (today: $_today) — clearing');
+        debugPrint('[LocalStorage] Data for "$key" is from $savedDate (today: $_today) — exporting CSV then clearing');
+
+        // Export CSV backup before clearing
+        final rawRows = payload['rows'] as List<dynamic>;
+        final rows = rawRows.map((r) => Map<String, dynamic>.from(r as Map)).toList();
+        if (rows.isNotEmpty) {
+          // Map key to column definitions
+          List<Map<String, String>> columns;
+          switch (key) {
+            case 'day_scholar':
+              columns = CsvService.dayScholarColumns;
+              break;
+            case 'hostel':
+              columns = CsvService.hostelColumns;
+              break;
+            case 'leave':
+              columns = CsvService.leaveColumns;
+              break;
+            default:
+              // Fallback: use all keys from first row
+              columns = rows.first.keys
+                  .where((k) => !k.startsWith('_'))
+                  .map((k) => {'key': k, 'header': k})
+                  .toList();
+          }
+          await CsvService().exportToCsv(
+            managerName: key,
+            date: savedDate ?? 'unknown',
+            rows: rows,
+            columns: columns,
+          );
+        }
+
         await file.delete();
         return [];
       }
@@ -126,6 +159,38 @@ class LocalStorageService {
       }
     } catch (e) {
       debugPrint('[LocalStorage] Error deleting "$key": $e');
+    }
+  }
+
+  /// Returns all _docId values from saved rows if the data is stale (from a previous day).
+  /// Returns empty list if data is current or doesn't exist.
+  /// Does NOT modify or delete the file.
+  Future<List<String>> getStaleDocIds(String key) async {
+    try {
+      final file = File('${_dataDir.path}${Platform.pathSeparator}$key.json');
+      if (!await file.exists()) return [];
+
+      final content = await file.readAsString();
+      final payload = jsonDecode(content) as Map<String, dynamic>;
+      final savedDate = payload['date'] as String?;
+
+      if (savedDate == _today) return []; // data is current, not stale
+
+      // Data is stale — extract all _docId values
+      final rawRows = payload['rows'] as List<dynamic>;
+      final docIds = <String>[];
+      for (final r in rawRows) {
+        final row = r as Map<String, dynamic>;
+        final docId = row['_docId']?.toString();
+        if (docId != null && docId.isNotEmpty) {
+          docIds.add(docId);
+        }
+      }
+      debugPrint('[LocalStorage] Found ${docIds.length} stale doc IDs for "$key" (date: $savedDate)');
+      return docIds;
+    } catch (e) {
+      debugPrint('[LocalStorage] Error checking stale docs for "$key": $e');
+      return [];
     }
   }
 }
